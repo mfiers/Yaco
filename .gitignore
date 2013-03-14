@@ -1,0 +1,6 @@
+Yaco.egg-info
+*.pyc
+*#
+*~
+build
+dist
