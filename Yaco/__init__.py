@@ -101,7 +101,7 @@ class Yaco(dict):
         elif isinstance(data, str) or isinstance(data):
             self.update(yaml.load(data))
         else:
-            raise(Exception("unkonwn data data type"))
+            raise Exception
 
     def __str__(self):
         """
@@ -349,8 +349,11 @@ class Yaco(dict):
                                   default_flow_style=False))
         else:
             with open(to_file, 'w', encoding='utf-8') as F:
-                F.write(yaml.dump(data, encoding='UTF-8',
-                                  default_flow_style=False))
+                dump = yaml.dump(data, default_flow_style=False)
+                F.write(dump)
+
+
+
 
 if __name__ == "__main__":
     if 'x' in sys.argv:
@@ -442,7 +445,7 @@ class PolyYaco():
         return str(self._merge())
     
     def has_key(self, key):
-        return self._merge().has_key(key)
+        return key in self._merge()
 
     def __setattr__(self, key, value):
         #see if this is an instance variable
