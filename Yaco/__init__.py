@@ -91,14 +91,15 @@ class Yaco(dict):
         Constructor
 
         :param data: data to initialize the Yaco structure with
-        :type data: dict
+        :type data: dict or yaml formatted string
         """
+
         dict.__init__(self)
 
         if isinstance(data, dict):
             self.update(data)
         elif isinstance(data, str) or isinstance(data):
-            data = yaml.load(data)
+            self.update(yaml.load(data))
         else:
             raise(Exception("unkonwn data data type"))
 
@@ -292,7 +293,8 @@ class Yaco(dict):
         """
         Return data as a pprint.pformatted string
         """
-        return pprint.pformat(self.get_data())
+        return yaml.dump(self.get_data(), encoding='utf-8',
+                         default_flow_style=False)
 
     def get_data(self):
         """
@@ -381,24 +383,35 @@ class PolyYaco():
     (manually for the time being).
     """
 
-    def __init__(self, name, config_files=None):
+    def __init__(self, name, base = None, files=None):
+        """
 
-        if config_files is None:
-            self._PolyYaco_config_files = (
+        """
+
+        if files is None:
+            self._PolyYaco_files = (
                 ('system', '/etc/{}.yaml'.format(name)),
                 ('user', '~/.config/{}/config.yaml'.format(name)),
                 )
         else:
-            self._PolyYaco_config_files = config_files
+            self._PolyYaco_files = files
 
+        if base is not None:
+            self._PolyYaco_files = (('_base', True), ) + self._PolyYaco_files
+            
         self._PolyYaco_yaco = {}
-        for cid, cfn in self._PolyYaco_config_files:
-            self._PolyYaco_yaco[cid] = Yaco()
 
+        for cid, cfn in self._PolyYaco_files:
+            if cid == '_base':
+                self._PolyYaco_yaco[cid] = Yaco(base)
+            else:
+                self._PolyYaco_yaco[cid] = Yaco()
         self.load()
 
     def load(self):
-        for cid, cfn in self._PolyYaco_config_files:
+        for cid, cfn in self._PolyYaco_files:
+            if cid == '_base': 
+                continue
             self._PolyYaco_yaco[cid] = Yaco()
             if os.path.exists(cfn):
                 self._PolyYaco_yaco[cid].load(cfn)
@@ -406,7 +419,7 @@ class PolyYaco():
                 self._PolyYaco_yaco[cid] = Yaco()
 
     def _getTop(self):
-        top_cid, top_cfn = self._PolyYaco_config_files[-1]
+        top_cid, top_cfn = self._PolyYaco_files[-1]
         return top_cid, top_cfn, self._PolyYaco_yaco[top_cid]
 
     def save(self):
@@ -415,7 +428,7 @@ class PolyYaco():
 
     def _merge(self):
         
-        for i, (cid, cfn) in enumerate(self._PolyYaco_config_files):
+        for i, (cid, cfn) in enumerate(self._PolyYaco_files):
             if i == 0:
                 y = self._PolyYaco_yaco[cid].copy()
             else:
@@ -424,7 +437,13 @@ class PolyYaco():
                 
     def simple(self):
         return self._merge().simple()
-        
+    
+    def __str__(self):
+        return str(self._merge())
+    
+    def has_key(self, key):
+        return self._merge().has_key(key)
+
     def __setattr__(self, key, value):
         #see if this is an instance variable
         if key[:9] == '_PolyYaco':
@@ -446,7 +465,7 @@ class PolyYaco():
             except KeyError:
                 raise AttributeError()
 
-        for cid, cfn in reversed(self._PolyYaco_config_files):
+        for cid, cfn in reversed(self._PolyYaco_files):
             cyc  = self._PolyYaco_yaco[cid]
             if key in cyc:
                 return cyc[key]
