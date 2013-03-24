@@ -98,10 +98,10 @@ class Yaco(dict):
 
         if isinstance(data, dict):
             self.update(data)
-        elif isinstance(data, str) or isinstance(data):
+        elif isinstance(data, str) or isinstance(data, bytes):
             self.update(yaml.load(data))
         else:
-            raise Exception
+            raise Exception('cannot parse %s' % type(data))
 
     def __str__(self):
         """
@@ -353,8 +353,6 @@ class Yaco(dict):
                 F.write(dump)
 
 
-
-
 if __name__ == "__main__":
     if 'x' in sys.argv:
         y = Yaco()
@@ -400,7 +398,8 @@ class PolyYaco():
             self._PolyYaco_files = files
 
         if base is not None:
-            self._PolyYaco_files = (('_base', True), ) + self._PolyYaco_files
+            self._PolyYaco_files = (('_base', True), ) +  \
+                tuple(self._PolyYaco_files)
             
         self._PolyYaco_yaco = {}
 
@@ -461,7 +460,13 @@ class PolyYaco():
         except KeyError:
             return default
 
+    
+    def __contains__(self, key):
+        return self._merge().__contains__(key)
+
     def __getattr__(self, key):
+        if isinstance(key, int):
+            print( 'íntkey', key)
         if key[:9] == '_PolyYaco':
             try:
                 return self.__dict__[key]
