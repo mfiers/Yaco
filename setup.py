@@ -14,15 +14,15 @@ from setuptools import setup
 DESCRIPTION = "YAML serializable dict like object with attribute style access and implicit branch creation"
 
 setup(name='Yaco',
-      version='0.1.12',
+      version='0.1.16',
       description=DESCRIPTION,
       author='Mark Fiers',
       author_email='mark.fiers42@gmail.com',
       url='https://github.com/mfiers/Yaco',
-      packages=['Yaco', ],
+      packages=['Yaco'],
       requires = [
-          'PyYAML (>3.0)',
-          ],
+        'PyYAML (>3.0)',
+        ],
       classifiers = [
           'Development Status :: 5 - Production/Stable',
           'Intended Audience :: Developers',

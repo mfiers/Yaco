@@ -277,7 +277,7 @@ class Yaco(dict):
         >>> y = Yaco()
         >>> y.load(tf.name)
         >>> assert(y.a[3][3].d == 4)
-        >>> assert(y.uni == "Aπ")
+        >>> assert(sys.version_info[0] == 2 or y.uni == "Aπ")
         """
         from_file = os.path.abspath(os.path.expanduser(from_file))
         if sys.version_info[0] == 2:
@@ -333,6 +333,12 @@ class Yaco(dict):
             data[k] = check_data(self[k])
         return data
 
+    def dump(self):
+        if sys.version_info[0] == 2:
+            return yaml.safe_dump(self.get_data(), 
+                    default_flow_style=False)
+        elif sys.version_info[0] == 3:
+            return yaml.dump(self.get_data(), default_flow_style=False)
 
     def save(self, to_file, doNotSave=[]):
         """
@@ -344,13 +350,11 @@ class Yaco(dict):
             if k in doNotSave:
                 del data[k]
         if sys.version_info[0] == 2:
-            with codecs.open(to_file, 'w', encoding='utf-8') as F:
-                F.write(yaml.dump(data, encoding='utf-8',
-                                  default_flow_style=False))
+            with open(to_file, 'w') as F:
+                F.write(self.dump())
         else:
             with open(to_file, 'w', encoding='utf-8') as F:
-                dump = yaml.dump(data, default_flow_style=False)
-                F.write(dump)
+                F.write(self.dump())
 
 
 if __name__ == "__main__":
