@@ -227,6 +227,48 @@ class Yaco(dict):
                 pass
         return old_list
 
+
+    def soft_update(self, data):
+        """
+        As update - but only update keys that do not have a value.
+
+        >>> d1 = {'a' : [1,2,3,{'b': 12}], 'd' : {'e': 72}}
+        >>> d2 = {'a' : [2,3,4,{'b': 12}], 'd' : {'e': 73, 'f': 18}, 'c' : 18}
+        >>> v = Yaco(d1)
+        >>> assert(v.a[2] == 3)
+        >>> assert(v.d.e == 72)
+        >>> v.soft_update(d2)
+        >>> assert(v.d.e == 72)
+        >>> assert(v.d.f == 18)
+        >>> assert(v.a[2] == 3)
+
+        """
+        if not data:
+            return
+
+        for key, value in list(data.items()):
+
+            old_value = super(Yaco, self).get(key, None)
+
+            if isinstance(value, dict):
+                if old_value and isinstance(old_value, Yaco):
+                    old_value.soft_update(value)
+                if old_value:
+                    #there is an older value - not a dict - cannot overwrite
+                    continue
+                else:
+                    #no old value - overwrite all you like
+                    super(Yaco, self).__setitem__(key, Yaco(value))
+            elif isinstance(value, list):
+                # parse the list to see if there are dicts - which
+                # need to be translated to Yaco objects
+                if not old_value:
+                    new_value = self._list_parser(value)
+                    super(Yaco, self).__setitem__(key, new_value)
+            else:
+                if not old_value:
+                    super(Yaco, self).__setitem__(key, value)
+
     def update(self, data):
         """
         >>> v = Yaco({'a' : [1,2,3,{'b' : 12}]})
@@ -432,7 +474,7 @@ class PolyYaco():
         cid, cfn, cyc = self._getTop()
         cyc.save(cfn)
 
-    def _merge(self):
+    def merge(self):
         
         for i, (cid, cfn) in enumerate(self._PolyYaco_files):
             if i == 0:
@@ -442,13 +484,13 @@ class PolyYaco():
         return y
                 
     def simple(self):
-        return self._merge().simple()
+        return self.merge().simple()
     
     def __str__(self):
-        return str(self._merge())
+        return str(self.merge())
     
     def has_key(self, key):
-        return key in self._merge()
+        return key in self.merge()
 
     def __setattr__(self, key, value):
         #see if this is an instance variable
@@ -466,7 +508,7 @@ class PolyYaco():
 
     
     def __contains__(self, key):
-        return self._merge().__contains__(key)
+        return self.merge().__contains__(key)
 
     def __getattr__(self, key):
         if isinstance(key, int):
