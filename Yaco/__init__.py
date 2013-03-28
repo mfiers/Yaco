@@ -66,7 +66,9 @@ data structures
 import os
 import sys
 import yaml
-import pprint
+import logging
+lg = logging.getLogger(__name__)
+#lg.setLevel(logging.DEBUG)
 
 if sys.version_info[0] == 2:
     import codecs
@@ -231,6 +233,8 @@ class Yaco(dict):
     def soft_update(self, data):
         """
         As update - but only update keys that do not have a value.
+
+        Note - lists are completely 
 
         >>> d1 = {'a' : [1,2,3,{'b': 12}], 'd' : {'e': 72}}
         >>> d2 = {'a' : [2,3,4,{'b': 12}], 'd' : {'e': 73, 'f': 18}, 'c' : 18}
@@ -460,10 +464,13 @@ class PolyYaco():
         for cid, cfn in self._PolyYaco_files:
             if cid == '_base': 
                 continue
+            cfn = os.path.expanduser(cfn)
             self._PolyYaco_yaco[cid] = Yaco()
             if os.path.exists(cfn):
+                lg.debug("Loading {0}".format(cfn))
                 self._PolyYaco_yaco[cid].load(cfn)
             else:
+                lg.debug("Not found {0}".format(cfn))
                 self._PolyYaco_yaco[cid] = Yaco()
 
     def _getTop(self):
@@ -475,8 +482,7 @@ class PolyYaco():
         cyc.save(cfn)
 
     def merge(self):
-        
-        for i, (cid, cfn) in enumerate(self._PolyYaco_files):
+        for i, (cid, cfn) in enumerate(reversed(self._PolyYaco_files)):
             if i == 0:
                 y = self._PolyYaco_yaco[cid].copy()
             else:
@@ -512,19 +518,15 @@ class PolyYaco():
 
     def __getattr__(self, key):
         if isinstance(key, int):
-            print( 'íntkey', key)
+            print( 'intkey', key)
+            sys.exit(-1)
         if key[:9] == '_PolyYaco':
             try:
                 return self.__dict__[key]
             except KeyError:
                 raise AttributeError()
 
-        for cid, cfn in reversed(self._PolyYaco_files):
-            cyc  = self._PolyYaco_yaco[cid]
-            if key in cyc:
-                return cyc[key]
-        else:
-            raise AttributeError()
+        return self.merge().__getattr__(key)
         
     __setitem__ = __setattr__
     __getitem__ = __getattr__
