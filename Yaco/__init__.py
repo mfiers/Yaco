@@ -182,7 +182,7 @@ class Yaco(dict):
             super(Yaco, self).__setitem__(key, rv)
             return rv
 
-    def __delitem__(self, name):
+    def __delattr__(self, name):
         return super(Yaco, self).__delitem__(name)
 
     def simple(self):
@@ -234,7 +234,7 @@ class Yaco(dict):
         """
         As update - but only update keys that do not have a value.
 
-        Note - lists are completely 
+        Note - lists are completely
 
         >>> d1 = {'a' : [1,2,3,{'b': 12}], 'd' : {'e': 72}}
         >>> d2 = {'a' : [2,3,4,{'b': 12}], 'd' : {'e': 73, 'f': 18}, 'c' : 18}
@@ -282,6 +282,7 @@ class Yaco(dict):
         >>> assert(v.a[3][1].b == 12)
 
         """
+
         if not data:
             return
 
@@ -304,6 +305,7 @@ class Yaco(dict):
 
     __getitem__ = __getattr__
     __setitem__ = __setattr__
+    __delitem__ = __delattr__
 
     def copy(self):
         ch = Yaco(self)
@@ -325,7 +327,8 @@ class Yaco(dict):
         >>> assert(y.a[3][3].d == 4)
         >>> assert(sys.version_info[0] == 2 or y.uni == "Aπ")
         """
-        from_file = os.path.abspath(os.path.expanduser(from_file))
+        from_file = os.path.expanduser(
+                os.path.abspath(os.path.expanduser(from_file)))
         if sys.version_info[0] == 2:
             with codecs.open(from_file, encoding='utf-8') as F:
                 data = yaml.load(F.read())
@@ -381,7 +384,7 @@ class Yaco(dict):
 
     def dump(self):
         if sys.version_info[0] == 2:
-            return yaml.safe_dump(self.get_data(), 
+            return yaml.safe_dump(self.get_data(),
                     default_flow_style=False)
         elif sys.version_info[0] == 3:
             return yaml.dump(self.get_data(), default_flow_style=False)
@@ -391,7 +394,7 @@ class Yaco(dict):
         """
 
         data = self.get_data()
-
+        to_file = os.path.expanduser(to_file)
         for k in list(data.keys()):
             if k in doNotSave:
                 del data[k]
@@ -441,8 +444,8 @@ class PolyYaco():
 
         if files is None:
             self._PolyYaco_files = (
-                ('system', '/etc/{}.yaml'.format(name)),
-                ('user', '~/.config/{}/config.yaml'.format(name)),
+                ('system', '/etc/{0}.yaml'.format(name)),
+                ('user', '~/.config/{0}/config.yaml'.format(name)),
                 )
         else:
             self._PolyYaco_files = files
@@ -450,7 +453,7 @@ class PolyYaco():
         if base is not None:
             self._PolyYaco_files = (('_base', True), ) +  \
                 tuple(self._PolyYaco_files)
-            
+
         self._PolyYaco_yaco = {}
 
         for cid, cfn in self._PolyYaco_files:
@@ -462,7 +465,7 @@ class PolyYaco():
 
     def load(self):
         for cid, cfn in self._PolyYaco_files:
-            if cid == '_base': 
+            if cid == '_base':
                 continue
             cfn = os.path.expanduser(cfn)
             self._PolyYaco_yaco[cid] = Yaco()
@@ -482,19 +485,19 @@ class PolyYaco():
         cyc.save(cfn)
 
     def merge(self):
-        for i, (cid, cfn) in enumerate(reversed(self._PolyYaco_files)):
+        for i, (cid, cfn) in enumerate((self._PolyYaco_files)):
             if i == 0:
                 y = self._PolyYaco_yaco[cid].copy()
             else:
                 y.update(self._PolyYaco_yaco[cid])
         return y
-                
+
     def simple(self):
         return self.merge().simple()
-    
+
     def __str__(self):
         return str(self.merge())
-    
+
     def has_key(self, key):
         return key in self.merge()
 
@@ -506,13 +509,17 @@ class PolyYaco():
         cid, cfn, cyc = self._getTop()
         cyc.__setattr__(key, value)
 
-    def get(self, key, default):
+    def get(self, key, default=None):
         try:
-            return self.__getattr__(key)
+            rv = self.__getattr__(key)
         except KeyError:
             return default
 
-    
+        if rv == {}:
+            return default
+        return rv
+
+
     def __contains__(self, key):
         return self.merge().__contains__(key)
 
@@ -527,6 +534,6 @@ class PolyYaco():
                 raise AttributeError()
 
         return self.merge().__getattr__(key)
-        
+
     __setitem__ = __setattr__
     __getitem__ = __getattr__
