@@ -63,15 +63,25 @@ data structures
 
 """
 
+import fnmatch
+import logging
 import os
 import sys
+import tempfile
 import yaml
-import logging
+
+from collections import OrderedDict
+
 lg = logging.getLogger(__name__)
 #lg.setLevel(logging.DEBUG)
 
 if sys.version_info[0] == 2:
     import codecs
+
+ITEM_INVALID = 0
+ITEM_FILE = 1
+ITEM_WEB = 2
+ITEM_STRING = 3
 
 
 class Yaco(dict):
@@ -406,16 +416,88 @@ class Yaco(dict):
                 F.write(self.dump())
 
 
-if __name__ == "__main__":
-    if 'x' in sys.argv:
-        y = Yaco()
-        y.x.z = 1
-        print(y.x.z)
-    else:
-        import doctest
-        doctest.testmod()
+class YacoFile(Yaco):
+    """
+    As Yaco, but loads from a file - or returns an emtpy object if it
+    cannot find the file
+    """
 
-class PolyYaco():
+    def __init__(self, filename):
+        """
+        Constructor
+
+        :param filename: filename to load
+        :type filename: string
+        """
+
+        dict.__init__(self)
+
+        self._filename = filename
+        self.load()
+
+    def load(self):
+        """
+        Load from the defined filename
+        """
+        super(YacoFile, self).load(self._filename)
+
+    def save(self):
+        """
+        Load from the defined filename
+        """
+        super(YacoFile, self).save(self._filename)
+
+
+class YacoDir(Yaco):
+    """
+    As Yaco, but load all files in a directory on top of each other.
+
+    Order of loading is the alphanumerical sort of filenames
+
+    loading of subdirectories is depth first
+
+    """
+
+    def __init__(self, dirname, pattern='*.yaml'):
+        """
+        Constructor
+
+        :param dirname: directory to load
+        :type dirname: string
+        :param glob: a glob describing what files to load
+        :type glob: string
+        """
+
+        dict.__init__(self)
+        self._directory = dirname
+        self._pattern = pattern
+        self.load()
+
+    def load(self):
+        """
+        Load from the defined directory
+        """
+
+        cache = os.path.join(self._directory, '.YacoCache')
+
+        for root, dirs, files in os.walk(self._directory):
+            to_parse = sorted(fnmatch.filter(files, self._pattern))
+            lg.critical("{} {}".format(root, dirs))
+            for filename in to_parse:
+                fullname = os.path.join(root, filename)
+                lg.critical("YacoDir loading {}".format(fullname))
+                super(YacoDir, self).load(fullname)
+
+        #after loading - save a cached copy!
+
+
+    def save(self):
+        """
+        Save is disabled.
+        """
+        raise Exeption("Cannot save to a YacoDir")
+
+class PolyYaco(object):
     """
     A meta object that allows a composite Yaco object to be loaded
     from any number of different files which are kept as a stack of
@@ -437,59 +519,95 @@ class PolyYaco():
     (manually for the time being).
     """
 
-    def __init__(self, name, base = None, files=None):
+    def __init__(self, name, files = [], base=None):
         """
 
         """
 
-        if files is None:
-            self._PolyYaco_files = (
-                ('system', '/etc/{0}.yaml'.format(name)),
-                ('user', '~/.config/{0}/config.yaml'.format(name)),
-                )
-        else:
-            self._PolyYaco_files = files
+        self._PolyYaco_base = base
+        self._PolyYaco_rawfiles = files
+        self._PolyYaco_filenames = []
+        self._PolyYaco_yacs = []
+        self._PolyYaco_dirty = False
 
-        if base is not None:
-            self._PolyYaco_files = (('_base', True), ) +  \
-                tuple(self._PolyYaco_files)
+        #if not items - set a default
+        if len(files) == 0:
+            self._PolyYaco_rawfiles = [
+                '/etc/{0}.yaml'.format(name),
+                '~/.config/{0}/*/*.yaml'.format(name),
+                '~/.config/{0}/*.yaml'.format(name),
+            ]
 
-        self._PolyYaco_yaco = {}
-
-        for cid, cfn in self._PolyYaco_files:
-            if cid == '_base':
-                self._PolyYaco_yaco[cid] = Yaco(base)
-            else:
-                self._PolyYaco_yaco[cid] = Yaco()
         self.load()
 
+    def load_file(fn):
+        """
+        Attemto to load the item fn as a file
+        """
+
+        if len(fn) > 504:
+            #wil not handle insanely long filenames
+            return ITEM_INVALID, None
+
+        fn = os.path.expanduser(fn)
+
+        if not os.path.exists(fn):
+            return ITEM_INVALID, None
+
+        content = Yaco()
+        content.load(fn)
+        return ITEM_FILE, content
+
+    def _load(self, item):
+
+        #see if this is a local file
+        ctype, content = self.load_file(item)
+        if ctype != ITEM_INVALID:
+            return ctype, content
+
     def load(self):
-        for cid, cfn in self._PolyYaco_files:
-            if cid == '_base':
-                continue
-            cfn = os.path.expanduser(cfn)
-            self._PolyYaco_yaco[cid] = Yaco()
-            if os.path.exists(cfn):
-                lg.debug("Loading {0}".format(cfn))
-                self._PolyYaco_yaco[cid].load(cfn)
-            else:
-                lg.debug("Not found {0}".format(cfn))
-                self._PolyYaco_yaco[cid] = Yaco()
+        """
+
+        """
+        self._PolyYaco_dirty = True
+        self._PolyYaco_filenames = []
+        self._PolyYaco_yacs = []
+        self._PolyYaco_merged = None
+
+        if not self._PolyYaco_base is None:
+            self._PolyYaco_filenames.append('_base')
+            self._PolyYaco_yacs.append(Yaco(self._PolyYaco_base))
+
+        for filename in self.files:
+            ctype, content = self.load_file(filename)
+            if ctype != ITEM_FILE:
+                raise Exception("Invalid file %s" % filename)
+
+            self._PolyYaco_filenames.append(filename)
+            self._PolyYaco_yacs.append(content)
 
     def _getTop(self):
-        top_cid, top_cfn = self._PolyYaco_files[-1]
-        return top_cid, top_cfn, self._PolyYaco_yaco[top_cid]
+        if len(self._PolyYaco_yacs) > 0:
+            return self._PolyYaco_filenames[-1], self._PolyYaco_yacs[-1]
+        else:
+            return None, None
 
     def save(self):
-        cid, cfn, cyc = self._getTop()
+        cfn, cyc = self._getTop()
+        if cfn == '_base':
+            raise Exception("Cannot save to 'base' configuration")
         cyc.save(cfn)
 
     def merge(self):
-        for i, (cid, cfn) in enumerate((self._PolyYaco_files)):
-            if i == 0:
-                y = self._PolyYaco_yaco[cid].copy()
-            else:
-                y.update(self._PolyYaco_yaco[cid])
+        if not self._PolyYaco_dirty:
+            return self._PolyYaco_merged
+
+        y = Yaco()
+        for yy in self._PolyYaco_yacs:
+            y.update(yy)
+
+        self._PolyYaco_merged = y
+        self._PolyYaco_dirty = False
         return y
 
     def simple(self):
@@ -506,7 +624,9 @@ class PolyYaco():
         if key[:9] == '_PolyYaco':
             self.__dict__[key] = value
             return
-        cid, cfn, cyc = self._getTop()
+
+        self._PolyYaco_dirty = True
+        cfn, cyc = self._getTop()
         cyc.__setattr__(key, value)
 
     def get(self, key, default=None):
@@ -525,8 +645,8 @@ class PolyYaco():
 
     def __getattr__(self, key):
         if isinstance(key, int):
-            print( 'intkey', key)
-            sys.exit(-1)
+            raise Exception('No integer keys please: %s' % key)
+
         if key[:9] == '_PolyYaco':
             try:
                 return self.__dict__[key]
@@ -537,3 +657,15 @@ class PolyYaco():
 
     __setitem__ = __setattr__
     __getitem__ = __getattr__
+
+
+
+if __name__ == "__main__":
+    if 'x' in sys.argv:
+        y = Yaco()
+        y.x.z = 1
+        print(y.x.z)
+    else:
+        import doctest
+        doctest.testmod()
+
