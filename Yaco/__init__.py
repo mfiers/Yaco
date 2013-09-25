@@ -67,10 +67,7 @@ import fnmatch
 import logging
 import os
 import sys
-import tempfile
 import yaml
-
-from collections import OrderedDict
 
 lg = logging.getLogger(__name__)
 #lg.setLevel(logging.DEBUG)
@@ -325,7 +322,6 @@ class Yaco(dict):
         """
         Load this dict from_file
 
-        >>> import yaml
         >>> import tempfile
         >>> tf = tempfile.NamedTemporaryFile(delete=True)
         >>> tf.close()
@@ -409,10 +405,10 @@ class Yaco(dict):
             if k in doNotSave:
                 del data[k]
         if sys.version_info[0] == 2:
-            with open(to_file, 'w') as F:
+            with open(to_file, 'w', 0) as F:
                 F.write(self.dump())
         else:
-            with open(to_file, 'w', encoding='utf-8') as F:
+            with open(to_file, 'w', 0, encoding='utf-8') as F:
                 F.write(self.dump())
 
 
@@ -482,10 +478,10 @@ class YacoDir(Yaco):
 
         for root, dirs, files in os.walk(self._directory):
             to_parse = sorted(fnmatch.filter(files, self._pattern))
-            lg.critical("{} {}".format(root, dirs))
+            lg.critical("{0} {1}".format(root, dirs))
             for filename in to_parse:
                 fullname = os.path.join(root, filename)
-                lg.critical("YacoDir loading {}".format(fullname))
+                lg.critical("YacoDir loading {0}".format(fullname))
                 super(YacoDir, self).load(fullname)
 
         #after loading - save a cached copy!
@@ -519,28 +515,29 @@ class PolyYaco(object):
     (manually for the time being).
     """
 
-    def __init__(self, name, files = [], base=None):
+    def __init__(self, name, files=[], base=None):
         """
 
         """
-
         self._PolyYaco_base = base
-        self._PolyYaco_rawfiles = files
         self._PolyYaco_filenames = []
         self._PolyYaco_yacs = []
         self._PolyYaco_dirty = False
 
         #if not items - set a default
-        if len(files) == 0:
+        if files is None:
             self._PolyYaco_rawfiles = [
                 '/etc/{0}.yaml'.format(name),
                 '~/.config/{0}/*/*.yaml'.format(name),
                 '~/.config/{0}/*.yaml'.format(name),
             ]
+        else:
+            self._PolyYaco_rawfiles = files
+
 
         self.load()
 
-    def load_file(fn):
+    def load_file(self, fn):
         """
         Attemto to load the item fn as a file
         """
@@ -554,8 +551,12 @@ class PolyYaco(object):
         if not os.path.exists(fn):
             return ITEM_INVALID, None
 
+        if os.path.isdir(fn):
+            return ITEM_INVALID, None
+
         content = Yaco()
         content.load(fn)
+#        print 'loaded', fn, content
         return ITEM_FILE, content
 
     def _load(self, item):
@@ -578,10 +579,8 @@ class PolyYaco(object):
             self._PolyYaco_filenames.append('_base')
             self._PolyYaco_yacs.append(Yaco(self._PolyYaco_base))
 
-        for filename in self.files:
+        for filename in self._PolyYaco_rawfiles:
             ctype, content = self.load_file(filename)
-            if ctype != ITEM_FILE:
-                raise Exception("Invalid file %s" % filename)
 
             self._PolyYaco_filenames.append(filename)
             self._PolyYaco_yacs.append(content)
@@ -637,6 +636,7 @@ class PolyYaco(object):
 
         if rv == {}:
             return default
+
         return rv
 
 
@@ -653,7 +653,8 @@ class PolyYaco(object):
             except KeyError:
                 raise AttributeError()
 
-        return self.merge().__getattr__(key)
+        rv = self.merge().__getattr__(key)
+        return rv
 
     __setitem__ = __setattr__
     __getitem__ = __getattr__
