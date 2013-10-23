@@ -1,1 +1,4 @@
 include *.txt
+include etc/test.config
+include etc/Yaco.config
+
