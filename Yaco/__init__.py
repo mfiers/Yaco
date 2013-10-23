@@ -66,6 +66,7 @@ data structures
 import fnmatch
 import logging
 import os
+import pkg_resources
 import sys
 import yaml
 
@@ -164,6 +165,7 @@ class Yaco(dict):
                 super(Yaco, self).__setitem__(key, value)
             else:
                 super(Yaco, self).__setitem__(key, Yaco(value))
+
         elif isinstance(value, list):
             # parse the list to see if there are dicts - which need to
             # be translated to Yaco objects
@@ -191,6 +193,28 @@ class Yaco(dict):
 
     def __delattr__(self, name):
         return super(Yaco, self).__delitem__(name)
+
+    def __getitem__(self, key):
+        """
+        as getattr, expect for when there is a '.' in the key.
+        """
+        if not '.' in key:
+            return self.__getattr__(key)
+        else:
+            k1, k2 = key.split('.', 1)
+            return self.__getattr__(k1)[k2]
+
+    def __setitem__(self, key, value):
+        """
+        as setattr, except for when there is a dot in the key
+        """
+        if not '.' in key:
+            return self.__setattr__(key, value)
+        else:
+            k1, k2 = key.split('.', 1)
+            self.__getattr__(k1)[k2] = value
+
+    __delitem__ = __delattr__
 
     def simple(self):
         """
@@ -310,17 +334,17 @@ class Yaco(dict):
             else:
                 super(Yaco, self).__setitem__(key, value)
 
-    __getitem__ = __getattr__
-    __setitem__ = __setattr__
-    __delitem__ = __delattr__
-
     def copy(self):
         ch = Yaco(self)
         return ch
 
-    def load(self, from_file):
+    def load(self, from_file, leaf=None):
         """
         Load this dict from_file
+
+        Note - it can load the file into a leaf, instead of the root
+        of this Yaco structure. Note - the leaf variable is a string,
+        but may contain dots (which are automatically interpreted)
 
         >>> import tempfile
         >>> tf = tempfile.NamedTemporaryFile(delete=True)
@@ -342,7 +366,10 @@ class Yaco(dict):
             with open(from_file, encoding='utf8') as F:
                 data = yaml.load(F)
 
-        self.update(data)
+        if leaf is None or leaf == '':
+            self.update(data)
+        else:
+            self[leaf].update(data)
 
     def pretty(self):
         """
@@ -450,8 +477,16 @@ class YacoDir(Yaco):
 
     Order of loading is the alphanumerical sort of filenames
 
-    loading of subdirectories is depth first
+    files in subdirectories are loaded into leaves
+    e.g. a file in /tmp/test/sub/a.yaml with only (x=1) will end up as follows:
 
+        y = YacoDir('/tmp/test')
+        y.sub.x == 1
+
+
+    Note, YacoDir will try to cache itself in a .yacodir.cache file in the root
+    of the dirname if the modification date of this file is the same as the
+    directory - that will be loaded instead.
     """
 
     def __init__(self, dirname, pattern='*.yaml'):
@@ -467,6 +502,7 @@ class YacoDir(Yaco):
         dict.__init__(self)
         self._directory = dirname
         self._pattern = pattern
+        self._cachefile = os.path.join(self._directory, '.yacodir.cache')
         self.load()
 
     def load(self):
@@ -474,24 +510,79 @@ class YacoDir(Yaco):
         Load from the defined directory
         """
 
-        cache = os.path.join(self._directory, '.YacoCache')
+        if os.path.exists(self._cachefile):
+            if os.path.getmtime(self._directory) == \
+                    os.path.getmtime(self._cachefile):
+                #load cache
+                super(YacoDir, self).load(self._cachefile)
+                return
 
         for root, dirs, files in os.walk(self._directory):
             to_parse = sorted(fnmatch.filter(files, self._pattern))
-            lg.critical("{0} {1}".format(root, dirs))
+            base = root.replace(self._directory, '').strip('/')
+            base = base.replace('/', '.')
+            lg.debug("{0} {1}".format(root, dirs))
             for filename in to_parse:
                 fullname = os.path.join(root, filename)
-                lg.critical("YacoDir loading {0}".format(fullname))
-                super(YacoDir, self).load(fullname)
+                lg.debug("YacoDir loading {0}".format(fullname))
+                super(YacoDir, self).load(fullname, leaf=base)
 
-        #after loading - save a cached copy!
-
+        #after loading - save to cache!
+        super(YacoDir, self).save(self._cachefile)
 
     def save(self):
         """
         Save is disabled.
         """
         raise Exeption("Cannot save to a YacoDir")
+
+
+class YacoPkg(Yaco):
+
+    def __init__(self, pkg_name, location=None):
+
+        if location is None:
+            location = os.path.join('etc', '{}.config'.format(pkg_name))
+        elif '*' in location and '/' in location:
+            #probably a path:
+            path, pattern = location.rsplit('/', 1)
+            config = YacoPkgDir(pkg_name, path, pattern)
+            self.update(config)
+            return None
+
+        try:
+            config = pkg_resources.resource_string(pkg_name, location)
+        except IOError:
+            lg.critical("Cannot find config file for package {} @ {}".format(
+                pkg_name, location))
+            sys.exit(-1)
+
+        self.update(yaml.load(config))
+
+class YacoNotADirectory(Exception):
+    pass
+
+class YacoPkgDir(Yaco):
+
+    def __init__(self, pkg_name, path, pattern='*.config'):
+
+        if not pkg_resources.resource_isdir(pkg_name, path):
+            raise YacoNotADirectory()
+
+        for d in pkg_resources.resource_listdir(pkg_name, path):
+            nres = os.path.join(path, d)
+            if pkg_resources.resource_isdir(pkg_name, nres):
+                #print 'ndir', nres
+                y = YacoPkgDir(pkg_name, nres, pattern)
+                self.update(y)
+            else:
+                if not fnmatch.fnmatch(d, pattern):
+                    # print 'file - no match', nres
+                    continue
+                else:
+                    y = YacoPkg(pkg_name, nres)
+                    self.update(y)
+
 
 class PolyYaco(object):
     """
@@ -515,7 +606,8 @@ class PolyYaco(object):
     (manually for the time being).
     """
 
-    def __init__(self, name, files=[], base=None):
+    def __init__(self, name="PY",
+                 files=[], base=None, ydpattern='*.config'):
         """
 
         """
@@ -523,48 +615,17 @@ class PolyYaco(object):
         self._PolyYaco_filenames = []
         self._PolyYaco_yacs = []
         self._PolyYaco_dirty = False
+        self._PolyYaco_ydpattern = ydpattern
 
         #if not items - set a default
         if files is None:
             self._PolyYaco_rawfiles = [
-                '/etc/{0}.yaml'.format(name),
-                '~/.config/{0}/*/*.yaml'.format(name),
-                '~/.config/{0}/*.yaml'.format(name),
-            ]
+                '/etc/{0}.config'.format(name),
+                '~/.config/{0}/'.format(name) ]
         else:
             self._PolyYaco_rawfiles = files
 
-
         self.load()
-
-    def load_file(self, fn):
-        """
-        Attemto to load the item fn as a file
-        """
-
-        if len(fn) > 504:
-            #wil not handle insanely long filenames
-            return ITEM_INVALID, None
-
-        fn = os.path.expanduser(fn)
-
-        if not os.path.exists(fn):
-            return ITEM_INVALID, None
-
-        if os.path.isdir(fn):
-            return ITEM_INVALID, None
-
-        content = Yaco()
-        content.load(fn)
-#        print 'loaded', fn, content
-        return ITEM_FILE, content
-
-    def _load(self, item):
-
-        #see if this is a local file
-        ctype, content = self.load_file(item)
-        if ctype != ITEM_INVALID:
-            return ctype, content
 
     def load(self):
         """
@@ -575,15 +636,33 @@ class PolyYaco(object):
         self._PolyYaco_yacs = []
         self._PolyYaco_merged = None
 
-        if not self._PolyYaco_base is None:
+        if self._PolyYaco_base is not None:
             self._PolyYaco_filenames.append('_base')
             self._PolyYaco_yacs.append(Yaco(self._PolyYaco_base))
 
         for filename in self._PolyYaco_rawfiles:
-            ctype, content = self.load_file(filename)
+            filename = os.path.expanduser(filename)
+
+            if filename[:6] == 'pkg://':
+                #expecting pkg://Yaco/etc/config.yaml
+                base = filename[6:]
+                pkg, loc = base.split('/', 1)
+                content = YacoPkg(pkg, loc)
+
+            elif os.path.isdir(filename):
+                content = YacoDir(filename, pattern = self._PolyYaco_ydpattern)
+                content.load()
+
+            elif os.path.isfile(filename):
+                content = Yaco()
+                content.load(filename)
+            else:
+                #nothing to load
+                continue
 
             self._PolyYaco_filenames.append(filename)
             self._PolyYaco_yacs.append(content)
+
 
     def _getTop(self):
         if len(self._PolyYaco_yacs) > 0:
