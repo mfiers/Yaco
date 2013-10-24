@@ -97,6 +97,27 @@ class BasicYacoTest(unittest.TestCase):
         self.assertNotEqual(y.b, 2)
         self.assertEqual(y.b.m, 10)
 
+    def test_leaf_update(self):
+        y = Yaco.Yaco()
+        y.a = 1
+        y.b.c.d = 2
+
+        z = Yaco.Yaco()
+        z.c = 3
+        z.e = 4
+        self.assertEqual(y.b.c.d, 2)
+        y[''].d = 5
+        self.assertEqual(y.d, 5)
+
+        y['b.c.d'] = 8
+        self.assertEqual(y.b.c.d, 8)
+
+        y['b.c'].update(z)
+        self.assertEqual(y.b.c.c, 3)
+        self.assertEqual(y.b.c.d, 8)
+        self.assertEqual(y.b.c.e, 4)
+
+
     def test_save_and_yaml(self):
         y = Yaco.Yaco(test_set_1)
         tmpfile = tempfile.NamedTemporaryFile(delete=False)
@@ -184,9 +205,7 @@ class BasicYacoDirTest(unittest.TestCase):
 
 
     def tearDown(self):
-        pass
-        #shutil.rmtree(self.tmpdir)
-
+        shutil.rmtree(self.tmpdir)
 
 
 class BasicPolyYacoTest(unittest.TestCase):
@@ -243,17 +262,20 @@ class BasicPolyYacoTest(unittest.TestCase):
 class BasicYacoPkgTest(unittest.TestCase):
 
     def test_get_basic(self):
-        y = Yaco.YacoPkg("Yaco")
+        y = Yaco.YacoPkg("Yaco", "etc/Yaco.config")
         self.assertEqual(y.Mus, 'musculus')
+
+    def test_leaf_loading(self):
+        y = Yaco.YacoPkg("Yaco", "etc/Yaco.config", leaf='a.b.c')
+        self.assertEqual(y.a.b.c.Mus, 'musculus')
 
     def test_get_custom_location(self):
         y = Yaco.YacoPkg("Yaco", 'etc/test.config')
         self.assertEqual(y.Sus, 'scrofa')
 
-
-class BasicYacoPkgDirTest(unittest.TestCase):
-
-    def test_get_basic(self):
-        y = Yaco.YacoPkgDir("Yaco", "/etc")
+    def test_basic_dir(self):
+        y = Yaco.YacoPkg("Yaco", "/etc", leaf='animal')
         self.assertEqual(y.Mus, 'musculus')
+        self.assertEqual(y.Sus, 'scrofa')
+
 

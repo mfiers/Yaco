@@ -96,7 +96,7 @@ class Yaco(dict):
 
     """
 
-    def __init__(self, data={}):
+    def __init__(self, data={}, leaf=None):
         """
         Constructor
 
@@ -106,12 +106,19 @@ class Yaco(dict):
 
         dict.__init__(self)
 
-        if isinstance(data, dict):
-            self.update(data)
-        elif isinstance(data, str) or isinstance(data, bytes):
-            self.update(yaml.load(data))
-        else:
-            raise Exception('cannot parse %s' % type(data))
+        if not data == {}:
+            to_update = None
+            if isinstance(data, dict):
+                to_update = data
+            elif isinstance(data, str) or isinstance(data, bytes):
+                to_update = yaml.load(data)
+            else:
+                raise Exception('cannot parse %s' % type(data))
+
+            if leaf is None or leaf == '':
+                self.update(to_update)
+            else:
+                self[leaf].update(to_update)
 
     def __str__(self):
         """
@@ -197,7 +204,15 @@ class Yaco(dict):
     def __getitem__(self, key):
         """
         as getattr, expect for when there is a '.' in the key.
+
+        it is possible to ask for yacoobject[''] - this is a form
+        of leaf loading - but means, give me the root. So - checking for
+        that
         """
+        #print(  key)
+        if key == '':
+            return self
+
         if not '.' in key:
             return self.__getattr__(key)
         else:
@@ -376,7 +391,7 @@ class Yaco(dict):
         Return data as a pprint.pformatted string
         """
         return yaml.dump(self.get_data(), encoding='utf-8',
-                         default_flow_style=False)
+                         default_flow_style=False).rstrip()
 
     def get_data(self):
         """
@@ -536,55 +551,57 @@ class YacoDir(Yaco):
         """
         raise Exeption("Cannot save to a YacoDir")
 
-
 class YacoPkg(Yaco):
 
-    def __init__(self, pkg_name, location=None):
+    def __init__(self, pkg_name, path,
+                 pattern='*.config', leaf="",
+                 base_path=None, prefix=None):
 
-        if location is None:
-            location = os.path.join('etc', '{}.config'.format(pkg_name))
-        elif '*' in location and '/' in location:
-            #probably a path:
-            path, pattern = location.rsplit('/', 1)
-            config = YacoPkgDir(pkg_name, path, pattern)
-            self.update(config)
-            return None
 
-        try:
-            config = pkg_resources.resource_string(pkg_name, location)
-        except IOError:
-            lg.critical("Cannot find config file for package {} @ {}".format(
-                pkg_name, location))
-            sys.exit(-1)
+        #lg.setLevel(logging.DEBUG)
+        lg.debug("pkg loading {} {} {}".format(pkg_name, path, pattern))
 
-        self.update(yaml.load(config))
-
-class YacoNotADirectory(Exception):
-    pass
-
-class YacoPkgDir(Yaco):
-
-    def __init__(self, pkg_name, path, pattern='*.config'):
+        if not base_path is None:
+            if leaf:
+                leaf = leaf.strip('.') + '.'
+            leaf = path.replace(base_path, '').strip('/').replace('/', '.')
+            lg.debug("leaf: ({}) {}".format(base_path, leaf))
 
         if not pkg_resources.resource_isdir(pkg_name, path):
-            raise YacoNotADirectory()
+            #asssume a file:
+            lg.debug("loading file {} {}".format(pkg_name, path))
+            y = pkg_resources.resource_string(pkg_name, path)
+            self[leaf].update(yaml.load(y))
 
-        for d in pkg_resources.resource_listdir(pkg_name, path):
-            nres = os.path.join(path, d)
-            if pkg_resources.resource_isdir(pkg_name, nres):
-                #print 'ndir', nres
-                y = YacoPkgDir(pkg_name, nres, pattern)
-                self.update(y)
-            else:
-                if not fnmatch.fnmatch(d, pattern):
-                    # print 'file - no match', nres
-                    continue
+        else:
+            for d in pkg_resources.resource_listdir(pkg_name, path):
+                nres = os.path.join(path, d)
+                #print('nn', nres, leaf)
+                lg.debug("checking for pkg load: {}".format(nres))
+                if pkg_resources.resource_isdir(pkg_name, nres):
+                    lg.debug("pkg load: is directory: {}".format(nres))
+                    if base_path == None:
+                        base_path = path
+                    #print('d', leaf, path, nres)
+                    y = YacoPkgDir(pkg_name, nres,
+                                   pattern=pattern,
+                                   base_path=base_path)
+                    self[leaf].update(y)
                 else:
-                    y = YacoPkg(pkg_name, nres)
-                    self.update(y)
+                    if not fnmatch.fnmatch(d, pattern):
+                        lg.debug('ignoring {}'.format(nres))
+                        continue
+                    else:
+                        lg.debug("pkg load: loading file: {}".format(nres))
+                        y =  yaml.load(pkg_resources.resource_string(pkg_name, nres))
+                        lg.debug("pkg load: got: {}".format(str(y)))
+                        #print('f', leaf, path, nres)
+                        self[leaf].update(y)
 
 
-class PolyYaco(object):
+YacoPkgDir = YacoPkg
+
+class PolyYaco(Yaco):
     """
     A meta object that allows a composite Yaco object to be loaded
     from any number of different files which are kept as a stack of
@@ -606,138 +623,69 @@ class PolyYaco(object):
     (manually for the time being).
     """
 
-    def __init__(self, name="PY",
-                 files=[], base=None, ydpattern='*.config'):
+    def __init__(self, name="PY", files=[],
+                 pattern='*.config',
+                 leaf=""):
         """
 
         """
-        self._PolyYaco_base = base
-        self._PolyYaco_filenames = []
-        self._PolyYaco_yacs = []
-        self._PolyYaco_dirty = False
-        self._PolyYaco_ydpattern = ydpattern
 
         #if not items - set a default
         if files is None:
-            self._PolyYaco_rawfiles = [
+            files = [
                 '/etc/{0}.config'.format(name),
                 '~/.config/{0}/'.format(name) ]
-        else:
-            self._PolyYaco_rawfiles = files
 
-        self.load()
+        super(PolyYaco, self).__init__()
+        self.load(leaf, files, pattern)
 
-    def load(self):
+    def load(self, leaf, files, pattern):
         """
 
         """
-        self._PolyYaco_dirty = True
-        self._PolyYaco_filenames = []
-        self._PolyYaco_yacs = []
-        self._PolyYaco_merged = None
 
-        if self._PolyYaco_base is not None:
-            self._PolyYaco_filenames.append('_base')
-            self._PolyYaco_yacs.append(Yaco(self._PolyYaco_base))
-
-        for filename in self._PolyYaco_rawfiles:
+        for filename in files:
             filename = os.path.expanduser(filename)
 
+            y  = None
             if filename[:6] == 'pkg://':
                 #expecting pkg://Yaco/etc/config.yaml
                 base = filename[6:]
                 pkg, loc = base.split('/', 1)
-                content = YacoPkg(pkg, loc)
+                this_pattern=pattern
+                if '*' in loc:
+                    if '/' in loc:
+                        loc, this_pattern = loc.rsplit('/', 1)
+                    else:
+                        loc, this_pattern = '/', loc
+
+                try:
+                    y = YacoPkg(pkg, loc, pattern=this_pattern)
+                except IOError:
+                    #file does probably not exists - ignore
+                    pass
 
             elif os.path.isdir(filename):
-                content = YacoDir(filename, pattern = self._PolyYaco_ydpattern)
-                content.load()
+                y = YacoDir(filename, pattern = self._PolyYaco_ydpattern)
+                y.load()
 
             elif os.path.isfile(filename):
-                content = Yaco()
-                content.load(filename)
+                y = Yaco()
+                y.load(filename)
             else:
                 #nothing to load
                 continue
 
-            self._PolyYaco_filenames.append(filename)
-            self._PolyYaco_yacs.append(content)
-
-
-    def _getTop(self):
-        if len(self._PolyYaco_yacs) > 0:
-            return self._PolyYaco_filenames[-1], self._PolyYaco_yacs[-1]
-        else:
-            return None, None
+            if not y is None:
+                self[leaf].update(y)
+        #print self.pretty()
 
     def save(self):
-        cfn, cyc = self._getTop()
-        if cfn == '_base':
-            raise Exception("Cannot save to 'base' configuration")
-        cyc.save(cfn)
-
-    def merge(self):
-        if not self._PolyYaco_dirty:
-            return self._PolyYaco_merged
-
-        y = Yaco()
-        for yy in self._PolyYaco_yacs:
-            y.update(yy)
-
-        self._PolyYaco_merged = y
-        self._PolyYaco_dirty = False
-        return y
-
-    def simple(self):
-        return self.merge().simple()
-
-    def __str__(self):
-        return str(self.merge())
-
-    def has_key(self, key):
-        return key in self.merge()
-
-    def __setattr__(self, key, value):
-        #see if this is an instance variable
-        if key[:9] == '_PolyYaco':
-            self.__dict__[key] = value
-            return
-
-        self._PolyYaco_dirty = True
-        cfn, cyc = self._getTop()
-        cyc.__setattr__(key, value)
-
-    def get(self, key, default=None):
-        try:
-            rv = self.__getattr__(key)
-        except KeyError:
-            return default
-
-        if rv == {}:
-            return default
-
-        return rv
-
-
-    def __contains__(self, key):
-        return self.merge().__contains__(key)
-
-    def __getattr__(self, key):
-        if isinstance(key, int):
-            raise Exception('No integer keys please: %s' % key)
-
-        if key[:9] == '_PolyYaco':
-            try:
-                return self.__dict__[key]
-            except KeyError:
-                raise AttributeError()
-
-        rv = self.merge().__getattr__(key)
-        return rv
-
-    __setitem__ = __setattr__
-    __getitem__ = __getattr__
-
+        lg.warning("PolyYaco save is disabled")
+        #cfn, cyc = self._getTop()
+        #if cfn == '_base':
+        #    raise Exception("Cannot save to 'base' configuration")
+        #cyc.save(cfn)
 
 
 if __name__ == "__main__":
