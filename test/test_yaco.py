@@ -171,14 +171,14 @@ class BasicYacoDirTest(unittest.TestCase):
     def setUp(self):
 
         self.tmpdir = tempfile.mkdtemp("PolyYacoTest")
-        sa = os.path.join(self.tmpdir, 'subdir_a', 'subsub_c')
-        sb = os.path.join(self.tmpdir, 'subdir_b')
+        sa = os.path.join(self.tmpdir, 'sub_a', 'sub_c')
+        sb = os.path.join(self.tmpdir, 'sub_b')
 
         os.makedirs(sa)
         os.makedirs(sb)
 
-        self.filenameA = os.path.join(self.tmpdir, '00.one.yaml')
-        self.filenameB = os.path.join(self.tmpdir, '10.two.yaml')
+        self.filenameA = os.path.join(self.tmpdir, '_one.config')
+        self.filenameB = os.path.join(self.tmpdir, 'two.config')
 
         #save two testsets to Yaco files
         y = Yaco.Yaco(test_set_1)
@@ -187,19 +187,24 @@ class BasicYacoDirTest(unittest.TestCase):
         y.save(self.filenameA)
         x.save(self.filenameB)
 
-        y.save(os.path.join(sa, 'three.yaml'))
-        x.save(os.path.join(sb, 'four.yaml'))
+        y.save(os.path.join(sa, 'three.config'))
+        x.save(os.path.join(sb, '_four.config'))
 
     def test_load(self):
         y = Yaco.YacoDir(self.tmpdir)
-        self.assertEqual(y.subdir_a.subsub_c.c.d, 3)
-        self.assertEqual(y.a, 18)  #10.two.yaml
-        self.assertEqual(y.c.d, 3) #00.one.yaml
-        self.assertEqual(y.b.k, 9) #10.two.yaml
+        #print y.pretty()
+        self.assertEqual(y.sub_a.sub_c.three.c.d, 3)
+        self.assertEqual(y.a, 1)
+        self.assertEqual(y.two.a, 18)
+        self.assertEqual(y.c.d, 3)
+        self.assertEqual(y.c.d, 3)
+
+        self.assertEqual(y.sub_a.sub_c.three.a, 1)
 
     def test_cache(self):
         y = Yaco.YacoDir(self.tmpdir)
-        self.assertTrue(os.path.exists(y._cachefile))
+        self.assertTrue(os.path.exists(
+            os.path.join(self.tmpdir, Yaco.YACODIR_CACHEFILE)))
         #hmm - loading it twice should activate cache loading
         y = Yaco.YacoDir(self.tmpdir)
 
@@ -253,7 +258,7 @@ class BasicPolyYacoTest(unittest.TestCase):
         y = Yaco.PolyYaco(files=[pkg, self.filenameA, self.subdir])
         self.assertEqual(y.c.e, 4)
         self.assertEqual(y.Mus, 'musculus')
-        self.assertEqual(y.Sus, 'scrofa')
+        #self.assertEqual(y.Sus, 'scrofa')
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
@@ -262,20 +267,22 @@ class BasicPolyYacoTest(unittest.TestCase):
 class BasicYacoPkgTest(unittest.TestCase):
 
     def test_get_basic(self):
-        y = Yaco.YacoPkg("Yaco", "etc/Yaco.config")
+        y = Yaco.YacoPkg("Yaco", "etc/__root__.config")
         self.assertEqual(y.Mus, 'musculus')
+        self.assertNotEqual(y.subset_a.Sus, 'scrofa')
 
-    def test_leaf_loading(self):
-        y = Yaco.YacoPkg("Yaco", "etc/Yaco.config", leaf='a.b.c')
+    def test_get_basic_subdir(self):
+        y = Yaco.YacoPkg("Yaco", "etc/")
+        self.assertEqual(y.Mus, 'musculus')
+        self.assertEqual(y.subset_a.Sus, 'scrofa')
+
+    def test_leaf_basic_loading(self):
+        y = Yaco.YacoPkg("Yaco", "etc/", leaf='a.b.c')
         self.assertEqual(y.a.b.c.Mus, 'musculus')
+        self.assertEqual(y.a.b.c.subset_a.Sus, 'scrofa')
 
     def test_get_custom_location(self):
-        y = Yaco.YacoPkg("Yaco", 'etc/test.config')
-        self.assertEqual(y.Sus, 'scrofa')
-
-    def test_basic_dir(self):
-        y = Yaco.YacoPkg("Yaco", "/etc", leaf='animal')
-        self.assertEqual(y.Mus, 'musculus')
+        y = Yaco.YacoPkg("Yaco", 'etc/subset_a/')
         self.assertEqual(y.Sus, 'scrofa')
 
 

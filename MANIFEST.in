@@ -1,4 +1,3 @@
 include *.txt
-include etc/test.config
-include etc/Yaco.config
 
+recursive-include Yaco/etc/ *.config

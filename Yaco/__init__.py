@@ -67,6 +67,7 @@ import fnmatch
 import logging
 import os
 import pkg_resources
+import re
 import sys
 import yaml
 
@@ -81,6 +82,8 @@ ITEM_FILE = 1
 ITEM_WEB = 2
 ITEM_STRING = 3
 
+ROOT_LEAF_PREFIX = "_"
+YACODIR_CACHEFILE = '.yacodir_cache'
 
 class Yaco(dict):
     """
@@ -427,6 +430,8 @@ class Yaco(dict):
                 continue
             if isinstance(k, (str)) and k and k[0] == '_':
                 continue
+            #print self.keys()
+            #print k, 'x' * 30
             data[k] = check_data(self[k])
         return data
 
@@ -486,6 +491,24 @@ class YacoFile(Yaco):
         super(YacoFile, self).save(self._filename)
 
 
+def _get_leaf(leaf, d, pattern):
+    """
+    Helper function to determine the leaf name
+    """
+    xleaf = d.rsplit('/', 1)[-1].strip()
+    check_pattern = re.match('\*(\.[a-zA-Z0-9]+)$', pattern)
+    if check_pattern:
+        xten = check_pattern.groups()[0]
+        if xleaf[-len(xten):] == xten:
+            xleaf = xleaf[:-len(xten)].strip()
+    if xleaf.find(ROOT_LEAF_PREFIX) == 0:
+        return leaf
+    elif leaf.strip():
+        return '{}.{}'.format(leaf, xleaf)
+    else:
+        return xleaf
+
+
 class YacoDir(Yaco):
     """
     As Yaco, but load all files in a directory on top of each other.
@@ -504,7 +527,7 @@ class YacoDir(Yaco):
     directory - that will be loaded instead.
     """
 
-    def __init__(self, dirname, pattern='*.yaml'):
+    def __init__(self, dirname, pattern='*.config'):
         """
         Constructor
 
@@ -515,41 +538,48 @@ class YacoDir(Yaco):
         """
 
         dict.__init__(self)
-        self._directory = dirname
-        self._pattern = pattern
-        self._cachefile = os.path.join(self._directory, '.yacodir.cache')
-        self.load()
+        self.load(dirname, pattern)
 
-    def load(self):
+    def load(self, dirname, pattern):
         """
         Load from the defined directory
         """
 
-        if os.path.exists(self._cachefile):
-            if os.path.getmtime(self._directory) == \
-                    os.path.getmtime(self._cachefile):
+        cachefile = os.path.join(dirname, YACODIR_CACHEFILE)
+
+        if os.path.exists(cachefile):
+            if os.path.getmtime(dirname) == \
+                    os.path.getmtime(cachefile):
                 #load cache
-                super(YacoDir, self).load(self._cachefile)
+                super(YacoDir, self).load(cachefile)
                 return
 
-        for root, dirs, files in os.walk(self._directory):
-            to_parse = sorted(fnmatch.filter(files, self._pattern))
-            base = root.replace(self._directory, '').strip('/')
+        for root, dirs, files in os.walk(dirname):
+            to_parse = sorted(fnmatch.filter(files, pattern))
+            base = root.replace(dirname, '').strip('/')
             base = base.replace('/', '.')
             lg.debug("{0} {1}".format(root, dirs))
             for filename in to_parse:
                 fullname = os.path.join(root, filename)
                 lg.debug("YacoDir loading {0}".format(fullname))
-                super(YacoDir, self).load(fullname, leaf=base)
+                nleaf = _get_leaf(base, filename, pattern)
+                with open(fullname) as F:
+                    y = yaml.load(F.read())
+                #print 'here', nleaf, y.keys()
+                if nleaf == '':
+                    self.update(y)
+                else:
+                    self[nleaf].update(y)
 
         #after loading - save to cache!
-        super(YacoDir, self).save(self._cachefile)
+        super(YacoDir, self).save(cachefile)
 
     def save(self):
         """
         Save is disabled.
         """
-        raise Exeption("Cannot save to a YacoDir")
+        raise Exception("Cannot save to a YacoDir")
+
 
 class YacoPkg(Yaco):
 
@@ -570,6 +600,7 @@ class YacoPkg(Yaco):
         if not pkg_resources.resource_isdir(pkg_name, path):
             #asssume a file:
             lg.debug("loading file {} {}".format(pkg_name, path))
+            #print("loading file {} {}".format(pkg_name, path))
             y = pkg_resources.resource_string(pkg_name, path)
             self[leaf].update(yaml.load(y))
 
@@ -582,7 +613,7 @@ class YacoPkg(Yaco):
                     lg.debug("pkg load: is directory: {}".format(nres))
                     if base_path == None:
                         base_path = path
-                    #print('d', leaf, path, nres)
+                    #print('d', leaf, pkg_name, nres)
                     y = YacoPkgDir(pkg_name, nres,
                                    pattern=pattern,
                                    base_path=base_path)
@@ -595,8 +626,9 @@ class YacoPkg(Yaco):
                         lg.debug("pkg load: loading file: {}".format(nres))
                         y =  yaml.load(pkg_resources.resource_string(pkg_name, nres))
                         lg.debug("pkg load: got: {}".format(str(y)))
-                        #print('f', leaf, path, nres)
-                        self[leaf].update(y)
+                        this_leaf = _get_leaf(leaf, d, pattern)
+                        #print('f', leaf, path, nres, d, this_leaf)
+                        self[this_leaf].update(y)
 
 
 YacoPkgDir = YacoPkg
@@ -663,11 +695,16 @@ class PolyYaco(Yaco):
                     y = YacoPkg(pkg, loc, pattern=this_pattern)
                 except IOError:
                     #file does probably not exists - ignore
+                    lg.debug("cannot load file {}".format(loc))
+                    pass
+                except ImportError:
+                    #or the complete package does not exists - one of script? ignore
+                    lg.debug("cannot find package {}".format(pkg))
+
                     pass
 
             elif os.path.isdir(filename):
-                y = YacoDir(filename, pattern = self._PolyYaco_ydpattern)
-                y.load()
+                y = YacoDir(filename, pattern = pattern)
 
             elif os.path.isfile(filename):
                 y = Yaco()
