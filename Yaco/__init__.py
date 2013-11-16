@@ -495,6 +495,7 @@ def _get_leaf(leaf, d, pattern):
     """
     Helper function to determine the leaf name
     """
+#    print('12312341234', leaf, d, pattern)
     xleaf = d.rsplit('/', 1)[-1].strip()
     check_pattern = re.match('\*(\.[a-zA-Z0-9]+)$', pattern)
     if check_pattern:
@@ -536,8 +537,8 @@ class YacoDir(Yaco):
         :param glob: a glob describing what files to load
         :type glob: string
         """
-
         dict.__init__(self)
+        #print("loading", dirname, pattern)
         self.load(dirname, pattern)
 
     def load(self, dirname, pattern):
@@ -547,32 +548,41 @@ class YacoDir(Yaco):
 
         cachefile = os.path.join(dirname, YACODIR_CACHEFILE)
 
-        if os.path.exists(cachefile):
-            if os.path.getmtime(dirname) == \
-                    os.path.getmtime(cachefile):
-                #load cache
-                super(YacoDir, self).load(cachefile)
-                return
+        # TODO: get caching to work properly :(
+        # if os.path.exists(cachefile):
+        #     if os.path.getmtime(dirname) == \
+        #             os.path.getmtime(cachefile):
+        #         #load cache
+        #         super(YacoDir, self).load(cachefile)
+        #         return
 
         for root, dirs, files in os.walk(dirname):
+            #print('-' * 80)
+            ##import sh
+            #print(sh.ls("-l", dirname))
+            #print(root, dirs, files, pattern)
             to_parse = sorted(fnmatch.filter(files, pattern))
             base = root.replace(dirname, '').strip('/')
             base = base.replace('/', '.')
-            lg.debug("{0} {1}".format(root, dirs))
+            #lg.critical("{0} {1}".format(root, dirs))
             for filename in to_parse:
                 fullname = os.path.join(root, filename)
                 lg.debug("YacoDir loading {0}".format(fullname))
+                #print ("loadlaod", filename, fullname)
                 nleaf = _get_leaf(base, filename, pattern)
+
                 with open(fullname) as F:
                     y = yaml.load(F.read())
-                #print 'here', nleaf, y.keys()
+
                 if nleaf == '':
                     self.update(y)
                 else:
                     self[nleaf].update(y)
-
-        #after loading - save to cache!
-        super(YacoDir, self).save(cachefile)
+        #print('*' * 80)
+        #print self.pretty()
+        if self:
+            #after loading - save to cache!
+            super(YacoDir, self).save(cachefile)
 
     def save(self):
         """
