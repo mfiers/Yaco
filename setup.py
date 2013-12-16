@@ -27,7 +27,7 @@ class Tox(TestCommand):
 DESCRIPTION = "YAML serializable dict like object with attribute style access and implicit branch creation"
 
 setup(name='Yaco',
-      version='0.1.23',
+      version='0.1.24',
       description=DESCRIPTION,
       author='Mark Fiers',
       author_email='mark.fiers42@gmail.com',
