@@ -213,10 +213,13 @@ class Yaco(dict):
         that
         """
         #print(  key)
+
         if key == '':
             return self
 
-        if not '.' in key:
+        if not isinstance(key, str):
+            return self.__getattr__(key)
+        elif not '.' in key:
             return self.__getattr__(key)
         else:
             k1, k2 = key.split('.', 1)
@@ -688,7 +691,7 @@ class PolyYaco(Yaco):
 
         for filename in files:
             filename = os.path.expanduser(filename)
-
+            lg.debug("Loading {}".format(filename))
             y  = None
             if filename[:6] == 'pkg://':
                 #expecting pkg://Yaco/etc/config.yaml
@@ -715,7 +718,7 @@ class PolyYaco(Yaco):
 
             elif os.path.isdir(filename):
                 y = YacoDir(filename, pattern = pattern)
-
+                #print('load dir')
             elif os.path.isfile(filename):
                 y = Yaco()
                 y.load(filename)
@@ -725,7 +728,6 @@ class PolyYaco(Yaco):
 
             if not y is None:
                 self[leaf].update(y)
-        #print self.pretty()
 
     def save(self):
         lg.warning("PolyYaco save is disabled")
