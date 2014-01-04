@@ -62,7 +62,6 @@ Todo: Need to find a more elegant way of testing without introducing
 data structures
 
 """
-
 import fnmatch
 import logging
 import os
