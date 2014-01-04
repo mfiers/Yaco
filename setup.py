@@ -13,6 +13,14 @@ from setuptools import setup
 from setuptools.command.test import test as TestCommand
 import sys
 
+from distutils.core import setup
+
+if sys.version < '3':
+      package_dir = {'': 'src.2'}
+
+else:
+      package_dir = {'': 'src.3'}
+
 class Tox(TestCommand):
     def finalize_options(self):
         TestCommand.finalize_options(self)
@@ -34,6 +42,7 @@ setup(name='Yaco',
       url='https://github.com/mfiers/Yaco',
       include_package_data=True,
       packages=['Yaco'],
+      package_dir=package_dir,
       install_requires = ['PyYAML>=3.0'],
       tests_require = ['tox'],
       cmdclass = {'test': Tox},
@@ -42,5 +51,6 @@ setup(name='Yaco',
           'Intended Audience :: Developers',
           'Operating System :: OS Independent',
           'Programming Language :: Python :: 2.7',
+          'Programming Language :: Python :: 3.3',
           ]
      )
