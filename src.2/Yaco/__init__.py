@@ -703,8 +703,8 @@ class YacoPkg(Yaco):
                     elif fnmatch.fnmatch(d, txt_pattern):
                         dl = d.replace('.txt', '')
                         this_leaf = _get_leaf(leaf, dl, pattern)
-                        lg.critical("loading: %s", d)
-                        lg.critical("   into: %s", this_leaf)
+                        lg.debug("loading: %s", d)
+                        lg.debug("   into: %s", this_leaf)
                         val = pkg_resources.resource_string(
                             pkg_name, nres)
                         self[this_leaf] = val
