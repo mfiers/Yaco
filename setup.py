@@ -21,6 +21,8 @@ if sys.version < '3':
 else:
       package_dir = {'': 'src.3'}
 
+#package_dir = {'': 'src'}
+
 class Tox(TestCommand):
     def finalize_options(self):
         TestCommand.finalize_options(self)
@@ -35,7 +37,7 @@ class Tox(TestCommand):
 DESCRIPTION = "YAML serializable dict like object with attribute style access and implicit branch creation"
 
 setup(name='Yaco',
-      version='0.1.26',
+      version='0.1.27',
       description=DESCRIPTION,
       author='Mark Fiers',
       author_email='mark.fiers42@gmail.com',
@@ -51,6 +53,8 @@ setup(name='Yaco',
           'Intended Audience :: Developers',
           'Operating System :: OS Independent',
           'Programming Language :: Python :: 2.7',
+          'Programming Language :: Python :: 3',
+          'Programming Language :: Python :: 3.2',
           'Programming Language :: Python :: 3.3',
           ]
      )
