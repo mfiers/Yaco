@@ -279,6 +279,8 @@ class BasicYacoPkgTest(unittest.TestCase):
     def test_leaf_basic_loading(self):
         y = Yaco.YacoPkg("Yaco", "etc/", leaf='a.b.c')
         self.assertEqual(y.a.b.c.Mus, 'musculus')
+        #import sys
+        #sys.stderr.write(y.pretty().decode('ascii'))
         self.assertEqual(y.a.b.c.subset_a.Sus, 'scrofa')
 
     def test_get_custom_location(self):
