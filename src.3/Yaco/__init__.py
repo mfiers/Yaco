@@ -84,6 +84,15 @@ ITEM_STRING = 3
 ROOT_LEAF_PREFIX = "_"
 YACODIR_CACHEFILE = '.yacodir_cache'
 
+#    db    db  .d8b.   .o88b.  .d88b.
+#    `8b  d8' d8' `8b d8P  Y8 .8P  Y8.
+#     `8bd8'  88ooo88 8P      88    88
+#       88    88~~~88 8b      88    88
+#       88    88   88 Y8b  d8 `8b  d8'
+#       YP    YP   YP  `Y88P'  `Y88P'
+
+
+
 class Yaco(dict):
     """
     Rather loosely based on http://code.activestate.com/recipes/473786/ (R1)
@@ -622,7 +631,7 @@ class YacoPkg(Yaco):
 
         #lg.setLevel(logging.DEBUG)
         thisleaf = None
-        if True:
+        if False:
             lg.warning("pkg loading name: {}".format(pkg_name))
             lg.warning("            path: {} {}".format(path, pattern))
             lg.warning("       base_path: {}".format(base_path))
@@ -643,7 +652,7 @@ class YacoPkg(Yaco):
         #                     .strip('/')\
         #                     .replace('/', '.')
 
-        lg.warning("leaf: ({}) {}".format(base_path, leaf))
+        lg.debug("leaf: ({}) {}".format(base_path, leaf))
 
         if not pkg_resources.resource_isdir(pkg_name, path):
             # this must be a file:
@@ -667,9 +676,10 @@ class YacoPkg(Yaco):
                         newleaf = d.replace('/', '.').strip('.')
 
                     lg.debug("pkg load: is directory: {}".format(nres))
+
                     if base_path is None:
                         base_path = path
-                    if True:
+                    if False:
                         lg.warning("loading subpackage")
                         lg.warning("       leaf: %s", leaf)
                         lg.warning("   new_leaf: %s", newleaf)

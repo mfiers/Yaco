@@ -631,7 +631,7 @@ class YacoPkg(Yaco):
 
         #lg.setLevel(logging.DEBUG)
         thisleaf = None
-        if True:
+        if False:
             lg.warning("pkg loading name: {}".format(pkg_name))
             lg.warning("            path: {} {}".format(path, pattern))
             lg.warning("       base_path: {}".format(base_path))
@@ -652,7 +652,7 @@ class YacoPkg(Yaco):
         #                     .strip('/')\
         #                     .replace('/', '.')
 
-        lg.warning("leaf: ({}) {}".format(base_path, leaf))
+        lg.debug("leaf: ({}) {}".format(base_path, leaf))
 
         if not pkg_resources.resource_isdir(pkg_name, path):
             # this must be a file:
@@ -679,7 +679,7 @@ class YacoPkg(Yaco):
 
                     if base_path is None:
                         base_path = path
-                    if True:
+                    if False:
                         lg.warning("loading subpackage")
                         lg.warning("       leaf: %s", leaf)
                         lg.warning("   new_leaf: %s", newleaf)
