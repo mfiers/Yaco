@@ -209,6 +209,14 @@ class Yaco(dict):
             super(Yaco, self).__setitem__(key, rv)
             return rv
 
+    def __contains__(self, key):
+        if not '.' in key:
+            return super(Yaco, self).__contains__(key)
+        else:
+            keya, keyb = key.split('.', 1)
+            return self[keya][keyb]
+
+
     def __delattr__(self, name):
         return super(Yaco, self).__delitem__(name)
 
