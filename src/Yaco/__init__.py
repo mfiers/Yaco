@@ -71,7 +71,7 @@ import sys
 import yaml
 
 lg = logging.getLogger(__name__)
-#lg.setLevel(logging.DEBUG)
+# lg.setLevel(logging.DEBUG)
 
 if sys.version_info[0] == 2:
     import codecs
@@ -91,7 +91,9 @@ YACODIR_CACHEFILE = '.yacodir_cache'
 #       88    88   88 Y8b  d8 `8b  d8'
 #       YP    YP   YP  `Y88P'  `Y88P'
 
+
 class Yaco(dict):
+
     """
     Originated from:
          http://code.activestate.com/recipes/473786/
@@ -171,11 +173,11 @@ class Yaco(dict):
         :param value: The value to assign to key
         """
 
-        #print "setting %s to %s" % (key, value)
+        # print "setting %s to %s" % (key, value)
         old_value = super(Yaco, self).get(key, None)
 
         if isinstance(value, dict):
-            #setting a dict
+            # setting a dict
             if isinstance(old_value, Yaco):
                 old_value.update(value)
             elif isinstance(value, Yaco):
@@ -191,9 +193,6 @@ class Yaco(dict):
         else:
             super(Yaco, self).__setitem__(key, value)
 
-    def has_key(self, key):
-        return key in list(super(Yaco, self).keys())
-
     def __getattr__(self, key):
         """
         >>> v= Yaco()
@@ -208,13 +207,30 @@ class Yaco(dict):
             super(Yaco, self).__setitem__(key, rv)
             return rv
 
+    def has_key(self, key):
+        """
+        As the dict has_key
+
+        >>> y = Yaco()
+        >>> y['a'] = 1
+        >>> y.b.c = 2
+        >>> assert(y.has_key('a'))
+        >>> assert(y.b.has_key('c'))
+        >>> assert(y.has_key('b.c'))
+
+        """
+        if '.' in key:
+            first, second = key.split('.', 1)
+            return self[first].has_key(second)
+        else:
+            return key in self.keys()
+
     def __contains__(self, key):
         if not '.' in key:
             return super(Yaco, self).__contains__(key)
         else:
             keya, keyb = key.split('.', 1)
             return self[keya][keyb]
-
 
     def __delattr__(self, name):
         return super(Yaco, self).__delitem__(name)
@@ -296,7 +312,6 @@ class Yaco(dict):
                 pass
         return old_list
 
-
     def soft_update(self, data):
         """
         As update - but only update keys that do not have a value.
@@ -325,10 +340,10 @@ class Yaco(dict):
                 if old_value and isinstance(old_value, Yaco):
                     old_value.soft_update(value)
                 if old_value:
-                    #there is an older value - not a dict - cannot overwrite
+                    # there is an older value - not a dict - cannot overwrite
                     continue
                 else:
-                    #no old value - overwrite all you like
+                    # no old value - overwrite all you like
                     super(Yaco, self).__setitem__(key, Yaco(value))
             elif isinstance(value, list):
                 # parse the list to see if there are dicts - which
@@ -394,7 +409,7 @@ class Yaco(dict):
         >>> assert(sys.version_info[0] == 2 or y.uni == "Aπ")
         """
         from_file = os.path.expanduser(
-                os.path.abspath(os.path.expanduser(from_file)))
+            os.path.abspath(os.path.expanduser(from_file)))
         if sys.version_info[0] == 2:
             with codecs.open(from_file, encoding='utf-8') as F:
                 data = yaml.load(F.read())
@@ -448,15 +463,15 @@ class Yaco(dict):
                 continue
             if isinstance(k, (str)) and k and k[0] == '_':
                 continue
-            #print self.keys()
-            #print k, 'x' * 30
+            # print self.keys()
+            # print k, 'x' * 30
             data[k] = check_data(self[k])
         return data
 
     def dump(self):
         if sys.version_info[0] == 2:
             return yaml.safe_dump(self.get_data(),
-                    default_flow_style=False)
+                                  default_flow_style=False)
         elif sys.version_info[0] == 3:
             return yaml.dump(self.get_data(), default_flow_style=False)
 
@@ -481,8 +496,8 @@ class Yaco(dict):
 #       YP    YP   YP  `Y88P'  `Y88P'  YP      Y888888P Y88888P Y88888P
 
 
-
 class YacoFile(Yaco):
+
     """
     As Yaco, but loads from a file - or returns an emtpy object if it
     cannot find the file
@@ -497,7 +512,6 @@ class YacoFile(Yaco):
         """
 
         dict.__init__(self)
-
         self._filename = filename
         self.load()
 
@@ -538,22 +552,26 @@ def _get_leaf(leaf, d, pattern):
 #       88    88   88 Y8b  d8 `8b  d8' 88  .8D   .88.   88 `88.
 #       YP    YP   YP  `Y88P'  `Y88P'  Y8888D' Y888888P 88   YD
 
+
 class YacoDir(Yaco):
+
     """
     As Yaco, but load all files in a directory on top of each other.
 
     Order of loading is the alphanumerical sort of filenames
 
     files in subdirectories are loaded into leaves
-    e.g. a file in /tmp/test/sub/a.yaml with only (x=1) will end up as follows:
+
+    e.g. a file in /tmp/test/sub/a.yaml with only (x=1) will end up
+    as follows:
 
         y = YacoDir('/tmp/test')
         y.sub.x == 1
 
 
-    Note, YacoDir will try to cache itself in a .yacodir.cache file in the root
-    of the dirname if the modification date of this file is the same as the
-    directory - that will be loaded instead.
+    Note, YacoDir will try to cache itself in a .yacodir.cache file in
+    the root of the dirname if the modification date of this file is
+    the same as the directory - that will be loaded instead.
     """
 
     def __init__(self, dirname, pattern='*.config'):
@@ -580,7 +598,7 @@ class YacoDir(Yaco):
         # if os.path.exists(cachefile):
         #     if os.path.getmtime(dirname) == \
         #             os.path.getmtime(cachefile):
-        #         #load cache
+        # load cache
         #         super(YacoDir, self).load(cachefile)
         #         return
 
@@ -607,9 +625,9 @@ class YacoDir(Yaco):
                 else:
                     self[nleaf].update(y)
         #print('*' * 80)
-        #print self.pretty()
+        # print self.pretty()
         if self:
-            #after loading - save to cache!
+            # after loading - save to cache!
             super(YacoDir, self).save(cachefile)
 
     def save(self):
@@ -635,8 +653,7 @@ class YacoPkg(Yaco):
                  base_path=None,
                  prefix=None):
 
-
-        #lg.setLevel(logging.DEBUG)
+        # lg.setLevel(logging.DEBUG)
         thisleaf = None
         if False:
             lg.warning("pkg loading name: {0}".format(pkg_name))
@@ -647,12 +664,11 @@ class YacoPkg(Yaco):
                 pkg_resources.resource_isdir(pkg_name, path)))
             lg.warning("            leaf: {0}".format(leaf))
 
-
         if leaf:
             leaf = leaf.strip('.')
 
         # if base_path is None:
-        #     #leave leaf as iss
+        # leave leaf as iss
         #     pass
         # else:
         #     leaf =  leaf + path.replace(base_path, '')\
@@ -703,7 +719,8 @@ class YacoPkg(Yaco):
                     if fnmatch.fnmatch(d, pattern):
                         this_leaf = _get_leaf(leaf, d, pattern)
                         lg.debug("pkg load: loading file: {0}".format(nres))
-                        y =  yaml.load(pkg_resources.resource_string(pkg_name, nres))
+                        y = yaml.load(
+                            pkg_resources.resource_string(pkg_name, nres))
                         lg.debug("pkg load: got: {0}".format(str(y)))
                         #print('f', leaf, nres, this_leaf, str(y)[:50])
                         self[this_leaf].update(y)
@@ -718,13 +735,22 @@ class YacoPkg(Yaco):
 
                     else:
                         lg.debug("Ignoring - file pattern mismatch: %s",
-                            d)
+                                 d)
 
+
+#    d8888b.  .d88b.  db      db    db
+#    88  `8D .8P  Y8. 88      `8b  d8'
+#    88oodD' 88    88 88       `8bd8'
+#    88~~~   88    88 88         88
+#    88      `8b  d8' 88booo.    88
+#    88       `Y88P'  Y88888P    YP
 
 
 YacoPkgDir = YacoPkg
 
+
 class PolyYaco(Yaco):
+
     """
     A meta object that allows a composite Yaco object to be loaded
     from any number of different files which are kept as a stack of
@@ -753,11 +779,11 @@ class PolyYaco(Yaco):
 
         """
 
-        #if not items - set a default
+        # if not items - set a default
         if files is None:
             files = [
                 '/etc/{0}.config'.format(name),
-                '~/.config/{0}/'.format(name) ]
+                '~/.config/{0}/'.format(name)]
 
         super(PolyYaco, self).__init__()
         self.load(leaf, files, pattern)
@@ -769,12 +795,12 @@ class PolyYaco(Yaco):
         for filename in files:
             filename = os.path.expanduser(filename)
             lg.debug("Loading {0}".format(filename))
-            y  = None
+            y = None
             if filename[:6] == 'pkg://':
-                #expecting pkg://Yaco/etc/config.yaml
+                # expecting pkg://Yaco/etc/config.yaml
                 base = filename[6:]
                 pkg, loc = base.split('/', 1)
-                this_pattern=pattern
+                this_pattern = pattern
                 if '*' in loc:
                     if '/' in loc:
                         loc, this_pattern = loc.rsplit('/', 1)
@@ -784,37 +810,49 @@ class PolyYaco(Yaco):
                 try:
                     y = YacoPkg(pkg, loc, pattern=this_pattern)
                 except IOError:
-                    #file does probably not exists - ignore
+                    # file does probably not exists - ignore
                     lg.debug("cannot load file {0}".format(loc))
                     pass
                 except ImportError:
-                    #or the complete package does not exists - one of script? ignore
+                    # or the complete package does not exists - one of script?
+                    # ignore
                     lg.debug("cannot find package {0}".format(pkg))
 
                     pass
 
             elif os.path.isdir(filename):
-                y = YacoDir(filename, pattern = pattern)
+                y = YacoDir(filename, pattern=pattern)
                 #print('load dir')
             elif os.path.isfile(filename):
                 y = Yaco()
                 y.load(filename)
             else:
-                #nothing to load
+                # nothing to load
                 continue
 
             if not y is None:
                 #print("update", filename, leaf)
-                #print(y.plugin.plugin)
+                # print(y.plugin.plugin)
                 self[leaf].update(y)
-        #print(self.pretty())
+        # print(self.pretty())
 
     def save(self):
         lg.warning("PolyYaco save is disabled")
         #cfn, cyc = self._getTop()
-        #if cfn == '_base':
+        # if cfn == '_base':
         #    raise Exception("Cannot save to 'base' configuration")
-        #cyc.save(cfn)
+        # cyc.save(cfn)
+
+
+class PolyDynYaco():
+
+    """
+    As PolyYaco, but dynamic - does not merge the files, but
+    resolves one by one
+    """
+
+    def __init__(self):
+        self._stack = []
 
 
 if __name__ == "__main__":
@@ -825,4 +863,3 @@ if __name__ == "__main__":
     else:
         import doctest
         doctest.testmod()
-
