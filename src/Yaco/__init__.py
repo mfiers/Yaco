@@ -91,11 +91,10 @@ YACODIR_CACHEFILE = '.yacodir_cache'
 #       88    88   88 Y8b  d8 `8b  d8'
 #       YP    YP   YP  `Y88P'  `Y88P'
 
-
-
 class Yaco(dict):
     """
-    Rather loosely based on http://code.activestate.com/recipes/473786/ (R1)
+    Originated from:
+         http://code.activestate.com/recipes/473786/
 
     >>> v= Yaco()
     >>> v.a = 1
@@ -528,7 +527,7 @@ def _get_leaf(leaf, d, pattern):
     if xleaf.find(ROOT_LEAF_PREFIX) == 0:
         return leaf
     elif leaf.strip():
-        return '{}.{}'.format(leaf, xleaf)
+        return '{0}.{1}'.format(leaf, xleaf)
     else:
         return xleaf
 
@@ -640,13 +639,13 @@ class YacoPkg(Yaco):
         #lg.setLevel(logging.DEBUG)
         thisleaf = None
         if False:
-            lg.warning("pkg loading name: {}".format(pkg_name))
-            lg.warning("            path: {} {}".format(path, pattern))
-            lg.warning("       base_path: {}".format(base_path))
+            lg.warning("pkg loading name: {0}".format(pkg_name))
+            lg.warning("            path: {0} {1}".format(path, pattern))
+            lg.warning("       base_path: {0}".format(base_path))
 
-            lg.warning("           isdir: {}".format(
+            lg.warning("           isdir: {0}".format(
                 pkg_resources.resource_isdir(pkg_name, path)))
-            lg.warning("            leaf: {}".format(leaf))
+            lg.warning("            leaf: {0}".format(leaf))
 
 
         if leaf:
@@ -660,30 +659,30 @@ class YacoPkg(Yaco):
         #                     .strip('/')\
         #                     .replace('/', '.')
 
-        lg.debug("leaf: ({}) {}".format(base_path, leaf))
+        lg.debug("leaf: ({0}) {1}".format(base_path, leaf))
 
         if not pkg_resources.resource_isdir(pkg_name, path):
             # this must be a file:
-            lg.debug("loading file {} {}".format(pkg_name, path))
+            lg.debug("loading file {0} {1}".format(pkg_name, path))
             #print("loading file {} {}".format(pkg_name, path))
             y = pkg_resources.resource_string(pkg_name, path)
 
             self[leaf].update(yaml.load(y))
 
         else:
-            lg.debug("loading from package {} {}".format(pkg_name, path))
+            lg.debug("loading from package {0} {1}".format(pkg_name, path))
 
             for d in pkg_resources.resource_listdir(pkg_name, path):
                 nres = os.path.join(path, d)
 
-                lg.debug("checking for pkg load: {}".format(nres))
+                lg.debug("checking for pkg load: {0}".format(nres))
                 if pkg_resources.resource_isdir(pkg_name, nres):
                     if leaf:
                         newleaf = leaf + '.' + d.replace('/', '.')
                     else:
                         newleaf = d.replace('/', '.').strip('.')
 
-                    lg.debug("pkg load: is directory: {}".format(nres))
+                    lg.debug("pkg load: is directory: {0}".format(nres))
 
                     if base_path is None:
                         base_path = path
@@ -703,9 +702,9 @@ class YacoPkg(Yaco):
                 else:
                     if fnmatch.fnmatch(d, pattern):
                         this_leaf = _get_leaf(leaf, d, pattern)
-                        lg.debug("pkg load: loading file: {}".format(nres))
+                        lg.debug("pkg load: loading file: {0}".format(nres))
                         y =  yaml.load(pkg_resources.resource_string(pkg_name, nres))
-                        lg.debug("pkg load: got: {}".format(str(y)))
+                        lg.debug("pkg load: got: {0}".format(str(y)))
                         #print('f', leaf, nres, this_leaf, str(y)[:50])
                         self[this_leaf].update(y)
                     elif fnmatch.fnmatch(d, txt_pattern):
@@ -769,7 +768,7 @@ class PolyYaco(Yaco):
         """
         for filename in files:
             filename = os.path.expanduser(filename)
-            lg.debug("Loading {}".format(filename))
+            lg.debug("Loading {0}".format(filename))
             y  = None
             if filename[:6] == 'pkg://':
                 #expecting pkg://Yaco/etc/config.yaml
@@ -786,11 +785,11 @@ class PolyYaco(Yaco):
                     y = YacoPkg(pkg, loc, pattern=this_pattern)
                 except IOError:
                     #file does probably not exists - ignore
-                    lg.debug("cannot load file {}".format(loc))
+                    lg.debug("cannot load file {0}".format(loc))
                     pass
                 except ImportError:
                     #or the complete package does not exists - one of script? ignore
-                    lg.debug("cannot find package {}".format(pkg))
+                    lg.debug("cannot find package {0}".format(pkg))
 
                     pass
 
@@ -822,7 +821,7 @@ if __name__ == "__main__":
     if 'x' in sys.argv:
         y = Yaco()
         y.x.z = 1
-        print((y.x.z))
+        print(y.x.z)
     else:
         import doctest
         doctest.testmod()

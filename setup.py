@@ -15,13 +15,9 @@ import sys
 
 from distutils.core import setup
 
-if sys.version < '3':
-      package_dir = {'': 'src.2'}
-
-else:
-      package_dir = {'': 'src.3'}
-
-#package_dir = {'': 'src'}
+extra = {}
+if sys.version_info >= (3,):
+    extra['use_2to3'] = True
 
 class Tox(TestCommand):
     def finalize_options(self):
@@ -29,7 +25,6 @@ class Tox(TestCommand):
         self.test_args = []
         self.test_suite = True
     def run_tests(self):
-        #import here, cause outside the eggs aren't loaded
         import tox
         errno = tox.cmdline(self.test_args)
         sys.exit(errno)
@@ -37,24 +32,27 @@ class Tox(TestCommand):
 DESCRIPTION = "YAML serializable dict like object with attribute style access and implicit branch creation"
 
 setup(name='Yaco',
-      version='0.1.30',
+      version='0.1.31',
       description=DESCRIPTION,
       author='Mark Fiers',
       author_email='mark.fiers42@gmail.com',
       url='https://github.com/mfiers/Yaco',
       include_package_data=True,
       packages=['Yaco'],
-      package_dir=package_dir,
+      package_dir={'': 'src'},
       install_requires = ['PyYAML>=3.0'],
-      tests_require = ['tox'],
+      tests_require = ['tox', 'PyYAML>=3.0'],
       cmdclass = {'test': Tox},
       classifiers = [
           'Development Status :: 5 - Production/Stable',
           'Intended Audience :: Developers',
           'Operating System :: OS Independent',
+          'Programming Language :: Python :: 2',
+          'Programming Language :: Python :: 2.6',
           'Programming Language :: Python :: 2.7',
           'Programming Language :: Python :: 3',
           'Programming Language :: Python :: 3.2',
           'Programming Language :: Python :: 3.3',
-          ]
+          ],
+      **extra
      )
