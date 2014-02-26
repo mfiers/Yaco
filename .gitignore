@@ -10,3 +10,4 @@ PyYAML-3.10-py2.7-macosx-10.8-intel.egg py-1.4.14-py2.7.egg py-1.4.14-py3.3.egg 
 dist/
 *.swp
 .tox/
+src/Yaco2.egg-info

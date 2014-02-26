@@ -31,16 +31,19 @@ class Tox(TestCommand):
 
 DESCRIPTION = "YAML serializable dict like object with attribute style access and implicit branch creation"
 
-setup(name='Yaco',
-      version='0.1.31',
+setup(name='Yaco2',
+      version='0.0.0',
       description=DESCRIPTION,
       author='Mark Fiers',
       author_email='mark.fiers42@gmail.com',
       url='https://github.com/mfiers/Yaco',
       include_package_data=True,
-      packages=['Yaco'],
+      packages=['Yaco2'],
       package_dir={'': 'src'},
-      install_requires = ['PyYAML>=3.0'],
+      install_requires = [
+        'PyYAML>=3.0',
+        'SQLAlchemy>0.9'
+      ],
       tests_require = ['tox', 'PyYAML>=3.0'],
       cmdclass = {'test': Tox},
       classifiers = [

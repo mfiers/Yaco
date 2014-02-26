@@ -1,0 +1,2 @@
+subdir.subsubdir.deep: inject
+subdir.subtest.d: overridden

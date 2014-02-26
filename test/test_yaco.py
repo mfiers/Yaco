@@ -1,290 +1,268 @@
 
 import os
 import logging
-import shutil
 import tempfile
 import unittest
 import yaml
+import collections
 
-import Yaco
+from sqlite3 import ProgrammingError
+
+import Yaco2
 
 lg = logging.getLogger(__name__)
 lg.setLevel(logging.DEBUG)
 
-test_set_1 = {
-    'a': 1,
-    'b': 2,
-    'c': {'d': 3,
-          'e': 4,
-          'f': 5},
-    'g': [0, 1, 2, 3,
-          {'h': 6,
-           'i': 7,
-           'j': 8,
-           }]}
-
-test_set_2 = {
-    'a': 18,
-    'b': {'k': 9,
-          'm': 10
-          },
-    'g': [0, 1, 2, 3, 4, 5]
-}
-
-
-def d():
-    return Yaco.Yaco(test_set_1)
 
 class BasicYacoTest(unittest.TestCase):
 
-    def test_load(self):
-        Yaco.Yaco()
+    def setUp(self):
+        self.y = Yaco2.Yaco()
+        self.z = Yaco2.Yaco()
+        self.prepopulate()
 
-    def test_simpledict(self):
-        y = Yaco.Yaco()
-        y['a'] = 1
-        y['b'] = 2
-        self.assertEqual(y['a'], 1)
-        self.assertEqual(y['b'], 2)
+    def prepopulate(self):
+        self.y['a'] = 5
+        self.z['a.a'] = 1
+        self.z['a.b'] = 2
+        self.z['b.c'] = 3
 
-        self.assertTrue('b' in y)
+    def test_basic_asignment(self):
+        self.y['a'] = 2
+        self.y['b'] = 3
+        self.assertEqual(self.y['a'], 2)
+        self.assertEqual(self.y['b'], 3)
 
-        del(y.b)
-        self.assertTrue(not 'b' in y)
-        self.assertTrue('b' not in y)
+    def test_keys(self):
+        kys = self.y.keys()
+        self.assertTrue(isinstance(kys, collections.Iterable))
+        self.assertEqual(set(kys), set(['a']))
 
-    def test_dots_in_keys(self):
-        y = Yaco.Yaco()
-        y.a.b = 2
-        assert(y['a.b'] == 2)
-        y['a.c.e'] = 4
-        assert(y.a.c.e == 4)
+        kys = self.z.keys()
+        self.assertTrue(isinstance(kys, collections.Iterable))
+        self.assertEqual(set(kys), set(['a.a', 'a.b', 'b.c']))
 
-    def test_yaco_has_attribute_access(self):
-        y = d()
-        self.assertEqual(y.a, 1)
-        self.assertEqual(y.b, 2)
+    def test_compare(self):
+        self.assertEqual(self.y, {'a': 5})
+        self.assertNotEqual(self.y, {'a': 2, 'b': 1})
 
-    def test_yaco_can_do_multiple_levels(self):
-        y = Yaco.Yaco()
-        y['a'] = Yaco.Yaco()
-        y['a']['b'] = 3
-        self.assertEqual(y['a']['b'], 3)
-        self.assertEqual(y.a.b, 3)
+    def test_vals(self):
+        kys = self.y.values()
+        self.assertTrue(isinstance(kys, collections.Iterable))
+        self.assertEqual(set(kys), set([5]))
+        kys = self.z.values()
+        self.assertEqual(set(kys), set([1, 2, 3]))
 
-    def test_load_from_dict(self):
-        y = Yaco.Yaco(test_set_1)
-        self.assertEqual(y['a'], 1)
-        self.assertEqual(y.c.e, 4)
+    def test_in(self):
+        self.assertTrue('a' in self.y)
+        self.assertTrue('a.a' in self.z)
+        self.assertTrue('a.b' in self.z)
+        self.assertFalse('a.c' in self.z)
+        self.assertTrue('b.c' in self.z)
 
-    def test_implicit_branch_creation(self):
-        y = Yaco.Yaco()
-        y.a.b.c = 4
-        self.assertEqual(y['a']['b']['c'], 4)
-        self.assertEqual(y.a.b.c, 4)
-
-    def test_list_integration(self):
-        y = Yaco.Yaco()
-        y.a.b.c = 4
-        y.a.d = [0, 1, 2, Yaco.Yaco()]
-        y.a.d[3].e = 'test'
-        self.assertEqual(y.a.d[3].e, 'test')
+    def test_clear_db(self):
+        self.assertEqual(len(list(self.y.keys())), 1)
+        self.y.clear()
+        self.assertEqual(len(list(self.y.keys())), 0)
 
     def test_update(self):
-        y = Yaco.Yaco(test_set_1)
-        self.assertEqual(y.b, 2)
-        y.update(test_set_2)
-        self.assertNotEqual(y.b, 2)
-        self.assertEqual(y.b.m, 10)
+        self.y['b'] = 2
+        self.y.update({'a': 5, 'c': 3, 'd': 4})
+        self.assertEqual(self.y, {'a': 5, 'b': 2, 'c': 3, 'd': 4})
 
-    def test_leaf_update(self):
-        y = Yaco.Yaco()
-        y.a = 1
-        y.b.c.d = 2
+    def test_to_dict(self):
+        d = dict(self.y)
+        self.assertEqual(type(d), type({}))
 
-        z = Yaco.Yaco()
-        z.c = 3
-        z.e = 4
-        self.assertEqual(y.b.c.d, 2)
-        y[''].d = 5
-        self.assertEqual(y.d, 5)
+    #
+    # branch tests
+    #
 
-        y['b.c.d'] = 8
-        self.assertEqual(y.b.c.d, 8)
+    def test_branch_simple(self):
+        s = self.y.get_branch('a')
+        self.assertFalse('a' in s)
+        kys = list(s.keys())
+        self.assertEqual(len(kys), 0)
 
-        y['b.c'].update(z)
-        self.assertEqual(y.b.c.c, 3)
-        self.assertEqual(y.b.c.d, 8)
-        self.assertEqual(y.b.c.e, 4)
+        t = self.z.get_branch('a')
+        self.assertTrue('a' in t)
+        kys = list(t.keys())
+        self.assertEqual(len(kys), 2)
 
+    def test_branch_keys(self):
+        t = self.z.get_branch('a')
+        kys = list(t.keys())
+        self.assertEqual(set(kys), set(['a', 'b']))
 
-    def test_save_and_yaml(self):
-        y = Yaco.Yaco(test_set_1)
-        tmpfile = tempfile.NamedTemporaryFile(delete=False)
-        y.save(tmpfile.name)
-        self.assertTrue(os.path.exists(tmpfile.name))
-        with open(tmpfile.name) as F:
-            YY = yaml.load(F)
-        self.assertEqual(YY['a'], 1)
-        self.assertEqual(YY['g'][4]['i'], 7)
+    def test_branch_iterate_values(self):
+        t = self.z.get_branch('a')
+        rv = set()
+        for i in t.values():
+            rv.add(i)
+        self.assertEqual(set([1, 2]), rv)
 
+    def test_branch_to_dict(self):
+        s = self.z.get_branch('a')
+        self.assertEqual(dict(s), {'a': 1, 'b': 2})
 
-class BasicYacoFileTest(unittest.TestCase):
+    def test_branch_update(self):
+        s = self.z.get_branch('a')
+        s.update({'a': 5, 'c': 3})
+        self.assertEqual(
+            self.z, {'b.c': 3, 'a.a': 5, 'a.b': 2, 'a.c': 3})
 
-    def setUp(self):
-        self.tmpdir = tempfile.mkdtemp("PolyYacoTest")
-        self.filename = os.path.join(self.tmpdir, 'one.yaml')
+    def test_update_with_a_branch(self):
+        s = self.z.get_branch('a')
+        self.y['c'] = 12
+        self.y.update(s)
+        self.assertEqual(self.y, {'a': 1, 'b': 2, 'c': 12})
 
-        #save a testset to Yaco files
-        y = Yaco.Yaco(test_set_1)
-        y.save(self.filename)
-
-    def test_load(self):
-        y = Yaco.YacoFile(self.filename)
-        self.assertEqual(y.b, 2)
-
-    def test_load_leaf(self):
-        y = Yaco.Yaco()
-        y.load(self.filename, "leaf")
-        self.assertEqual(y.leaf.b, 2)
-
-    def test_load_leaf_2(self):
-        y = Yaco.Yaco()
-        y.load(self.filename, "deeply.nested.leaf")
-        self.assertEqual(y.deeply.nested.leaf.b, 2)
-
-    def test_loadsave(self):
-        y = Yaco.YacoFile(self.filename)
-        y.load()
-        self.assertEqual(y.b, 2)
-        y.b = 3
-        y.save()
-        z = Yaco.YacoFile(self.filename)
-        self.assertEqual(y.b, 3)
-
-    def tearDown(self):
-        shutil.rmtree(self.tmpdir)
+    def test_update_a_branch_with_a_branch(self):
+        s = self.z.get_branch('a')
+        self.y['c'] = 12
+        t = self.y.get_branch('a.b.c')
+        t.update(s)
+        self.assertEqual(
+            self.y, {'a': 5, 'c': 12, 'a.b.c.a': 1, 'a.b.c.b': 2})
 
 
-class BasicYacoDirTest(unittest.TestCase):
+class DbYacoTest(BasicYacoTest):
+
+    """
+    All basic dictionary tests should also work for the
+    db variant.
+
+    """
 
     def setUp(self):
+        self.dbloc_a = tempfile.NamedTemporaryFile(delete=False)
+        self.dbloc_a.close()
+        self.y = Yaco2.YacoDb(self.dbloc_a.name)
 
-        self.tmpdir = tempfile.mkdtemp("PolyYacoTest")
-        sa = os.path.join(self.tmpdir, 'sub_a', 'sub_c')
-        sb = os.path.join(self.tmpdir, 'sub_b')
+        self.dbloc_b = tempfile.NamedTemporaryFile(delete=False)
+        self.dbloc_b.close()
+        self.z = Yaco2.YacoDb(self.dbloc_b.name)
+        self.prepopulate()
 
-        os.makedirs(sa)
-        os.makedirs(sb)
+    def test_persistence(self):
 
-        self.filenameA = os.path.join(self.tmpdir, '_one.config')
-        self.filenameB = os.path.join(self.tmpdir, 'two.config')
+        tf = tempfile.NamedTemporaryFile(delete=False)
+        tf.close()
 
-        #save two testsets to Yaco files
-        y = Yaco.Yaco(test_set_1)
-        x = Yaco.Yaco(test_set_2)
+        a = Yaco2.YacoDb(tf.name)
+        a['q'] = 55
+        a.close()
 
-        y.save(self.filenameA)
-        x.save(self.filenameB)
+        b = Yaco2.YacoDb(tf.name)
+        self.assertEqual(b['q'], 55)
 
-        y.save(os.path.join(sa, 'three.config'))
-        x.save(os.path.join(sb, '_four.config'))
+        b.close(delete_db=True)
 
-    def test_load(self):
-        y = Yaco.YacoDir(self.tmpdir)
-        #print y.pretty()
-        self.assertEqual(y.sub_a.sub_c.three.c.d, 3)
-        self.assertEqual(y.a, 1)
-        self.assertEqual(y.two.a, 18)
-        self.assertEqual(y.c.d, 3)
-        self.assertEqual(y.c.d, 3)
+    def test_close_db(self):
 
-        self.assertEqual(y.sub_a.sub_c.three.a, 1)
+        self.assertTrue(os.path.exists(self.y.datapath))
+        self.y.close()
 
-    def test_cache(self):
-        y = Yaco.YacoDir(self.tmpdir)
-        self.assertTrue(os.path.exists(
-            os.path.join(self.tmpdir, Yaco.YACODIR_CACHEFILE)))
-        #hmm - loading it twice should activate cache loading
-        y = Yaco.YacoDir(self.tmpdir)
+        self.assertRaises(ProgrammingError, lambda: self.y['a'])
+        self.assertTrue(os.path.exists(self.y.datapath))
 
+    def test_delete_db(self):
+        self.assertTrue(os.path.exists(self.y.datapath))
+        self.y.close(delete_db=True)
+        self.assertRaises(ProgrammingError, lambda: self.y['a'])
+        self.assertFalse(os.path.exists(self.y.datapath))
 
     def tearDown(self):
-        shutil.rmtree(self.tmpdir)
+        try:
+            self.y.close(delete_db=True)
+        except OSError:
+            pass
+        try:
+            self.z.close(delete_db=True)
+        except OSError:
+            pass
+
+test_yaml = """
+a:
+  b1:
+    c1: v1
+    c2: v2
+    c3: v3
+  b2: v4
+b: v5
+"""
+
+test_dict = yaml.load(test_yaml)
 
 
-class BasicPolyYacoTest(unittest.TestCase):
+class LoaderTest(unittest.TestCase):
 
     def setUp(self):
+        self.tf = tempfile.NamedTemporaryFile(delete=False)
+        self.tf.write(test_yaml)
+        self.tf.close()
+        self.test_dir = os.path.join(
+            os.path.dirname(__file__), 'data')
 
-        self.tmpdir = tempfile.mkdtemp("PolyYacoTest")
+    def get_empty_yaco(self):
+        return Yaco2.Yaco()
 
-        self.filenameA = os.path.join(self.tmpdir, 'one.yaml')
-        self.filenameB = os.path.join(self.tmpdir, 'two.yaml')
+    def test_dict_loader(self):
+        y = self.get_empty_yaco()
+        Yaco2.dict_loader(y, test_dict)
+        self.assertEqual(y['a.b1.c2'], 'v2')
+        self.assertEqual(y['b'], 'v5')
 
-        sb = os.path.join(self.tmpdir, 'subdir_b')
-        self.subdir = sb
-        os.makedirs(sb)
-
-        #save two testsets to Yaco files
-        y = Yaco.Yaco(test_set_1)
-        x = Yaco.Yaco(test_set_2)
-
-        y.save(self.filenameA)
-        x.save(self.filenameB)
-        x.save(os.path.join(sb, 'four.yaml'))
+    def test_yaml_string_loader(self):
+        y = self.get_empty_yaco()
+        Yaco2.yaml_string_loader(y, test_yaml)
+        self.assertEqual(y['a.b1.c2'], 'v2')
+        self.assertEqual(y['b'], 'v5')
+        z = self.get_empty_yaco()
+        Yaco2.dict_loader(z, test_dict)
+        self.assertEqual(y, z)
 
 
-    def get_py_files(self):
-        return Yaco.PolyYaco(files=[self.filenameA, self.filenameB])
+    def test_yaml_file_loader(self):
+        y = self.get_empty_yaco()
+        Yaco2.yaml_file_loader(y, self.tf.name)
+        self.assertEqual(y['a.b1.c2'], 'v2')
+        self.assertEqual(y['b'], 'v5')
+        z = self.get_empty_yaco()
+        Yaco2.dict_loader(z, test_dict)
+        self.assertEqual(y, z)
 
-    def get_py_filesanddirs(self):
-        return Yaco.PolyYaco(files=[self.filenameA, self.subdir])
+    def test_dir_loader(self):
+        y = self.get_empty_yaco()
+        Yaco2.dir_loader(y, self.test_dir)
+        self.assertEqual(y['test.a'], 1)
+        self.assertEqual(y['subdir.subtest.e.g'], 4)
+        self.assertEqual(y['subdir.subsubdir.subsubtest.g'], 4)
+        self.assertEqual(y['subdir.subtest.d'], 'overridden')
+        self.assertEqual(y['subdir.raw'].strip(),
+            'multiline\ntext\nfield')
 
-    def test_load(self):
-        y = Yaco.PolyYaco()
 
-    def test_load_files(self):
-        y = self.get_py_files()
-        self.assertEqual(y.c.e, 4)
-
-    def test_load_filesanddirs(self):
-        pkg = 'pkg://Yaco/etc/test.config'
-        y = Yaco.PolyYaco(files=[pkg, self.filenameA, self.subdir])
-        self.assertEqual(y.c.e, 4)
-
-    def test_load_filespkgsanddirs_pattern(self):
-        pkg = 'pkg://Yaco/etc/*.config'
-        y = Yaco.PolyYaco(files=[pkg, self.filenameA, self.subdir])
-        self.assertEqual(y.c.e, 4)
-        self.assertEqual(y.Mus, 'musculus')
-        #self.assertEqual(y.Sus, 'scrofa')
+    def test_package_loader(self):
+        y = self.get_empty_yaco()
+        Yaco2.package_loader(y, "Yaco2", "etc")
+        self.assertEqual(y['Mus'], 'musculus')
+        self.assertEqual(y['subdir.Rattus'], 'norvegicus')
+        self.assertEqual(y['subdir.Sus'], 'scrofa')
+        self.assertEqual(y['subdir.test.Gallus'], 'Gallus')
 
     def tearDown(self):
-        shutil.rmtree(self.tmpdir)
+        os.unlink(self.tf.name)
 
 
-class BasicYacoPkgTest(unittest.TestCase):
+class LoaderDbTest(LoaderTest):
 
-    def test_get_basic(self):
-        y = Yaco.YacoPkg("Yaco", "etc/__root__.config")
-        self.assertEqual(y.Mus, 'musculus')
-        self.assertNotEqual(y.subset_a.Sus, 'scrofa')
+    def get_empty_yaco(self):
+        self.ydb = tempfile.NamedTemporaryFile(delete=False)
+        self.ydb.close()
+        return Yaco2.YacoDb(self.ydb.name)
 
-    def test_get_basic_subdir(self):
-        y = Yaco.YacoPkg("Yaco", "etc/")
-        self.assertEqual(y.Mus, 'musculus')
-        self.assertEqual(y.subset_a.Sus, 'scrofa')
-
-    def test_leaf_basic_loading(self):
-        y = Yaco.YacoPkg("Yaco", "etc/", leaf='a.b.c')
-        self.assertEqual(y.a.b.c.Mus, 'musculus')
-        #import sys
-        #sys.stderr.write(y.pretty().decode('ascii'))
-        self.assertEqual(y.a.b.c.subset_a.Sus, 'scrofa')
-
-    def test_get_custom_location(self):
-        y = Yaco.YacoPkg("Yaco", 'etc/subset_a/')
-        self.assertEqual(y.Sus, 'scrofa')
-
+    def tearDown(self):
+        os.unlink(self.tf.name)
+        os.unlink(self.ydb.name)
 
