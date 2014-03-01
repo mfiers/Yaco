@@ -10,6 +10,7 @@ import pkg_resources
 import yaml
 
 lg = logging.getLogger(__name__)
+lg.setLevel(logging.DEBUG)
 
 _demo_object = yaml.load(
 """
@@ -21,12 +22,56 @@ a:
   b2: v4
 """)
 
+#['pkg://leip/etc/*.config', u'/Users/u0089478/.config/leip/', '/etc/leip/']
+
+def guess_loader(data):
+    if isinstance(data, dict):
+        return dict_loader
+    elif not isinstance(data, basestring):
+        raise Exception("Invalid data type {0} ({1}".format(
+            str(data)[:50], type(data)))
+    elif os.path.isdir(data):
+        return dir_loader
+    elif data[:6] == 'pkg://':
+        return simple_package_loader
+    elif os.path.isfile(data):
+        try:
+            name, ext = data.rsplit('.', 1)
+            if ext.lower() in ['yaml', 'config', 'conf']:
+                return yaml_file_loader
+            else:
+                raise Exception("unknown file type: {0}".format(data))
+        except:
+            #just go for it :/
+            return yaml_file_loader
+    elif data[0] == '/' or data[0] == '~':
+        #looks like a file or dir - but may not exists..
+        return dummy_loader
+    else:
+        #assume it's just plain yaml
+        return yaml_string_loader
+
+def dummy_loader(yaco_object, data):
+    """
+    Do not do anything - just pretend
+    """
+    pass
+
+def load(yaco_object, data):
+    """
+    Generic loader - tries to be smart
+    """
+    guess_loader(data)(yaco_object, data)
 
 def dict_loader(yaco_object, dictionary):
     """
     Populate a yaco object from a dictionary
     """
-    for k, v in dictionary.iteritems():
+    if isinstance(dictionary, str):
+        raise Exception("invalid dictionary: {}".format(
+            str(dictionary)[:80]))
+        exit(-1)
+    for k, v in dictionary.items():
         if isinstance(v, dict):
             dict_loader(yaco_object.get_branch(k), v)
         else:
@@ -71,7 +116,7 @@ def dir_loader(yaco_object, path):
             # get the proper branch
             branch_name = branch_base
             if f[0] != '_':
-                branch_name += '.{}'.format(file_name)
+                branch_name += '.{0}'.format(file_name)
             branch_name.lstrip('.')  # no dots at the end allowed
             branch = yaco_object.get_branch(branch_name)
 
@@ -82,6 +127,12 @@ def dir_loader(yaco_object, path):
                     val = F.read()
                 yaco_object[branch_name] = val
 
+
+def simple_package_loader(yaco_object, data):
+    assert(data[:6] == 'pkg://')
+    name, path = data[6:].split('/', 1)
+    path = '/' + path
+    return package_loader(yaco_object, name, path)
 
 def package_loader(yaco_object, pkg_name, path, start_path=None):
 
@@ -98,12 +149,17 @@ def package_loader(yaco_object, pkg_name, path, start_path=None):
         branch_name = os.path.relpath(base_path, start_path)\
             .replace('/', '.').strip('.')
 
-        if filename[0] != '_':
-            branch_name += ".{}".format(file_base)
-
         data = pkg_resources.resource_string(pkg_name, path)
-        b = yaco_object.get_branch(branch_name, absolute=True)
-        yaml_string_loader(b, data)
+
+        if filename[0] != '_':
+            branch_name += ".{0}".format(file_base)
+
+        if file_ext in ['yaml', 'conf', 'config']:
+            b = yaco_object.get_branch(branch_name, absolute=True)
+            yaml_string_loader(b, data)
+        elif file_ext in ['txt']:
+            r = yaco_object.get_branch("", absolute=True)
+            r[branch_name] = data
         return
 
     # It's a directory

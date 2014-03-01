@@ -5,9 +5,12 @@ Based on the UserDict
 """
 
 import copy
+import logging
 import re
 import sys
 import types
+
+lg = logging.getLogger(__name__)
 
 
 class Yaco(object):
@@ -25,7 +28,6 @@ class Yaco(object):
                  data=None,
                  branch='',
                  default="__RAISE_ERROR__"):
-
 
         self.default = default
 
@@ -59,7 +61,6 @@ class Yaco(object):
     def __enter__(self):
         pass
 
-
     def __exit__(self):
         pass
 
@@ -88,24 +89,109 @@ class Yaco(object):
         """
         new_branch = branch
         if not absolute:
-            new_branch = "{}.{}".format(self.branch, new_branch)
+            new_branch = "{0}.{1}".format(self.branch, new_branch)
         new_branch = new_branch.strip(".")
+        rv = self.__class__(self, branch=new_branch)
+        return rv
 
-        return self.__class__(self, branch=new_branch)
+    def leaf(self):
+        """
+        Return the leaf name of the current branch
+
+        >>> y = Yaco()
+        >>> y['a.b.c.d'] = 1
+        >>> b = y.get_branch('a.b.c')
+        >>> assert(b.leaf() == 'c')
+        """
+        if not self.branch:
+            return ""
+        else:
+            return self.branch.rsplit('.')[-1]
+
+    def find(self, pattern):
+        """
+        Find a pattern & return a serie of branches
+
+        >>> y = Yaco()
+        >>> y['a.b'] = 1
+        >>> y['q.b'] = 1
+        >>> y['a.c'] = 2
+        >>> y['a.c.e'] = 2
+        >>> y['a.d.c'] = 3
+        >>> rv = set()
+        >>> for y in y.find('a'):
+        ...     rv.add(y.branch)
+        >>> assert(rv == set(['a.c', 'a.d', 'a.b']))
+        """
+
+        regex = pattern.replace('*', r'[A-Za-z0-9_]+')
+        regex = '^(' + regex + ')\.(.*)'
+        rx = re.compile(regex)
+        yielded = []
+        for k in self.keys():
+            mtch = rx.search(k)
+            if not mtch:
+                continue
+            pre, to_yield = mtch.groups()
+            to_yield = to_yield.split('.')[0]
+            to_yield = '{0}.{1}'.format(pattern, to_yield)
+            if to_yield in yielded:
+                continue
+            yielded.append(to_yield)
+            yield self.get_branch(to_yield)
+
+    def __str__(self):
+        rv = ''
+        if self.branch:
+            rv = '[{0}]'.format(self.branch)
+
+        rv += '{'
+
+        keygen = self.keys()
+        for i, k in enumerate(keygen):
+            if i > 3:
+                break
+            if i > 0:
+                rv += ','
+            rv += "'{0}': {1}".format(k, self[k])
+
+        try:
+            nxt = keygen.next()
+            rv += '...'
+        except StopIteration:
+            pass
+
+        rv += '}'
+        return rv
 
     def __repr__(self):
         return repr(self.data)
 
-    def __cmp__(self, other):
+    def __eq__(self, other):
         """
         >>> a = Yaco({'a' : 1, 'b' : 2})
         >>> b = Yaco({'a' : 1, 'b' : 2})
-        >>> assert(a == b)
         >>> c = Yaco({'a' : 1, 'b' : 3})
+        >>> assert(a == b)
         >>> assert(a != c)
         """
-        return cmp(dict(self), dict(other))
+        ka = set(self.keys())
+        kb = set(other.keys())
+        if ka != kb:
+            return False
 
+        for k in self.keys():
+            if self[k] != other[k]:
+                return False
+        return True
+
+    def __ne__(self, other):
+        """ Use __eq__ """
+        return not self == other
+
+    def __cmp__(self, other):
+        """ Use __eq__ """
+        return self == other
 
     __hash__ = None  # Avoid Py3k warning
 
@@ -126,7 +212,7 @@ class Yaco(object):
         >>> assert(b['b'] == 2)
         """
         if self.branch:
-            key = '{}.{}'.format(self.branch, key)
+            key = '{0}.{1}'.format(self.branch, key)
 
         try:
             return self.data[key]
@@ -145,7 +231,7 @@ class Yaco(object):
         >>> assert(b['c'] == 3)
         """
         if self.branch:
-            key = '{}.{}'.format(self.branch, key)
+            key = '{0}.{1}'.format(self.branch, key)
         self.data[key] = item
 
     def __delitem__(self, key):
@@ -159,7 +245,7 @@ class Yaco(object):
         >>> assert(not b.has_key('a'))
         """
         if self.branch:
-            key = '{}.{}'.format(self.branch, key)
+            key = '{0}.{1}'.format(self.branch, key)
         del self.data[key]
 
     def has_key(self, key):
@@ -170,7 +256,7 @@ class Yaco(object):
         >>> assert(b.has_key('a'))
         """
         if self.branch:
-            key = '{}.{}'.format(self.branch, key)
+            key = '{0}.{1}'.format(self.branch, key)
         return key in self.data
 
     def clear(self):
@@ -208,10 +294,10 @@ class Yaco(object):
         >>> assert(len(ii) == 2)
         >>> assert(ii == [('a', 1), ('b', 2)])
         """
-        for k, v in self.data.iteritems():
+        for k, v in self.data.items():
             if not self.branch:
                 yield k, v
-            elif k.startswith('{}.'.format(self.branch)):
+            elif k.startswith('{0}.'.format(self.branch)):
                 yield (k[len(self.branch) + 1:], v)
 
     def iterkeys(self):
@@ -249,7 +335,7 @@ class Yaco(object):
         >>> a.update(c)
         >>> assert(a['f'] == 4)
         """
-        for k, v in dict.iteritems():
+        for k, v in dict.items():
             self[k] = v
 
     def __contains__(self, key):
@@ -262,7 +348,7 @@ class Yaco(object):
         >>> assert('e' not in b)
         """
         if self.branch:
-            key = '{}.{}'.format(self.branch, key)
+            key = '{0}.{1}'.format(self.branch, key)
         return key in self.data
 
     def get(self, key, failobj=None):
@@ -293,7 +379,7 @@ class Yaco(object):
         rv = []
         for k in sorted(self.keys()):
             v = self[k]
-            rv.append("{}{}: '{}'".format(prefix, k, v))
+            rv.append("{0}{1}: '{2}'".format(prefix, k, v))
         return "\n".join(rv)
 
     # def setdefault(self, key, failobj=None):

@@ -34,7 +34,8 @@ from Yaco2.ydb import YacoDb
 from Yaco2.stack import YacoStack
 
 from Yaco2.loader import dict_loader, yaml_string_loader, \
-    yaml_file_loader, dir_loader, package_loader
+    yaml_file_loader, dir_loader, package_loader, \
+    simple_package_loader, load
 
 
 #    db    db  .d8b.   .o88b.  .d88b.

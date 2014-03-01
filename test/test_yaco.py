@@ -103,6 +103,7 @@ class BasicYacoTest(unittest.TestCase):
 
     def test_branch_to_dict(self):
         s = self.z.get_branch('a')
+        #lg.critical("branch11 - %s", dict(s))
         self.assertEqual(dict(s), {'a': 1, 'b': 2})
 
     def test_branch_update(self):
@@ -199,7 +200,7 @@ class LoaderTest(unittest.TestCase):
 
     def setUp(self):
         self.tf = tempfile.NamedTemporaryFile(delete=False)
-        self.tf.write(test_yaml)
+        self.tf.write(test_yaml.encode('utf8'))
         self.tf.close()
         self.test_dir = os.path.join(
             os.path.dirname(__file__), 'data')
@@ -213,6 +214,12 @@ class LoaderTest(unittest.TestCase):
         self.assertEqual(y['a.b1.c2'], 'v2')
         self.assertEqual(y['b'], 'v5')
 
+    def test_simple_loader_yaml(self):
+        y = self.get_empty_yaco()
+        Yaco2.load(y, test_dict)
+        self.assertEqual(y['a.b1.c2'], 'v2')
+        self.assertEqual(y['b'], 'v5')
+
     def test_yaml_string_loader(self):
         y = self.get_empty_yaco()
         Yaco2.yaml_string_loader(y, test_yaml)
@@ -223,9 +230,28 @@ class LoaderTest(unittest.TestCase):
         self.assertEqual(y, z)
 
 
+    def test_yaml_string_loader_simple(self):
+        y = self.get_empty_yaco()
+        Yaco2.load(y, test_yaml)
+        self.assertEqual(y['a.b1.c2'], 'v2')
+        self.assertEqual(y['b'], 'v5')
+        z = self.get_empty_yaco()
+        Yaco2.dict_loader(z, test_dict)
+        self.assertEqual(y, z)
+
     def test_yaml_file_loader(self):
         y = self.get_empty_yaco()
         Yaco2.yaml_file_loader(y, self.tf.name)
+        self.assertEqual(y['a.b1.c2'], 'v2')
+        self.assertEqual(y['b'], 'v5')
+        z = self.get_empty_yaco()
+        Yaco2.dict_loader(z, test_dict)
+        self.assertEqual(y, z)
+
+
+    def test_yaml_file_loader_simple(self):
+        y = self.get_empty_yaco()
+        Yaco2.load(y, self.tf.name)
         self.assertEqual(y['a.b1.c2'], 'v2')
         self.assertEqual(y['b'], 'v5')
         z = self.get_empty_yaco()
@@ -240,12 +266,27 @@ class LoaderTest(unittest.TestCase):
         self.assertEqual(y['subdir.subsubdir.subsubtest.g'], 4)
         self.assertEqual(y['subdir.subtest.d'], 'overridden')
         self.assertEqual(y['subdir.raw'].strip(),
-            'multiline\ntext\nfield')
-
+                         'multiline\ntext\nfield')
 
     def test_package_loader(self):
         y = self.get_empty_yaco()
         Yaco2.package_loader(y, "Yaco2", "etc")
+        self.assertEqual(y['Mus'], 'musculus')
+        self.assertEqual(y['subdir.Rattus'], 'norvegicus')
+        self.assertEqual(y['subdir.Sus'], 'scrofa')
+        self.assertEqual(y['subdir.test.Gallus'], 'Gallus')
+
+    def test_simple_package_loader(self):
+        y = self.get_empty_yaco()
+        Yaco2.simple_package_loader(y, "pkg://Yaco2/etc")
+        self.assertEqual(y['Mus'], 'musculus')
+        self.assertEqual(y['subdir.Rattus'], 'norvegicus')
+        self.assertEqual(y['subdir.Sus'], 'scrofa')
+        self.assertEqual(y['subdir.test.Gallus'], 'Gallus')
+
+    def test_simple_loader(self):
+        y = self.get_empty_yaco()
+        Yaco2.load(y, "pkg://Yaco2/etc")
         self.assertEqual(y['Mus'], 'musculus')
         self.assertEqual(y['subdir.Rattus'], 'norvegicus')
         self.assertEqual(y['subdir.Sus'], 'scrofa')
@@ -265,4 +306,3 @@ class LoaderDbTest(LoaderTest):
     def tearDown(self):
         os.unlink(self.tf.name)
         os.unlink(self.ydb.name)
-

@@ -36,7 +36,8 @@ class YacoDb(Yaco):
     a subtree of the key/value database
     """
 
-    def __init__(self, data, branch='', default="__RAISE_ERROR__"):
+    def __init__(self, data, branch='',
+                 default="__RAISE_ERROR__"):
         """
         Create the object & open the database
 
@@ -48,7 +49,7 @@ class YacoDb(Yaco):
             data={}, branch=branch,
             default=default)
 
-        if isinstance(data, str):
+        if isinstance(data, str) or isinstance(data, unicode):
             "assume this is a path to a database"
             self.datapath = data
             self.open()
@@ -79,6 +80,10 @@ class YacoDb(Yaco):
         >>> assert(isinstance(f.data, sqlite3.Connection))
         >>> f.close(delete_db=True)
         """
+        dbpath, dbname = os.path.split(self.datapath)
+        if not os.path.exists(dbpath):
+            os.makedirs(dbpath)
+        lg.debug("opening Yaco2 database: {0}".format(self.datapath))
         self.data = sqlite3.connect(self.datapath)
         self.data.text_factory = bytes
         self.execute("""
@@ -129,7 +134,7 @@ class YacoDb(Yaco):
 
         # adapt key if branchbed
         if self.branch != '':
-            key = '{}.{}'.format(self.branch, key)
+            key = '{0}.{1}'.format(self.branch, key)
 
         c = self.execute("""
             SELECT * from yaco
@@ -164,7 +169,7 @@ class YacoDb(Yaco):
         """
         vts = pickle.dumps(val)
         if self.branch:
-            key = '{}.{}'.format(self.branch, key)
+            key = '{0}.{1}'.format(self.branch, key)
         self.execute("""
             INSERT OR REPLACE
             INTO yaco (key, val)
@@ -192,7 +197,7 @@ class YacoDb(Yaco):
 
         """
         if self.branch:
-            key = '{}.{}'.format(self.branch, key)
+            key = '{0}.{1}'.format(self.branch, key)
             lg.critical(key)
         self.execute("""
             DELETE FROM yaco
@@ -252,7 +257,7 @@ class YacoDb(Yaco):
         else:
             sql = """
                 SELECT key,val from yaco
-                WHERE key LIKE '{}.%'
+                WHERE key LIKE '{0}.%'
                 LIMIT ? OFFSET ?""".format(self.branch)
 
         while True:
@@ -263,7 +268,7 @@ class YacoDb(Yaco):
             for k, v in res:
                 if self.branch != '':
                     k = k[len(self.branch) + 1:]
-                yield (k, pickle.loads(v))
+                yield (k.decode('ascii'), pickle.loads(v))
             offset += step
 
     def keys(self):
@@ -337,7 +342,7 @@ class YacoDb(Yaco):
         """
 
         if self.branch:
-            key = '{}.{}'.format(self.branch, key)
+            key = '{0}.{1}'.format(self.branch, key)
 
         c = self.execute("""
             SELECT * from yaco
