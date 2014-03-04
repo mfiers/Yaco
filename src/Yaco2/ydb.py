@@ -88,7 +88,7 @@ class YacoDb(Yaco):
         if not os.path.exists(dbpath):
             os.makedirs(dbpath)
         lg.debug("opening Yaco2 database: {0}".format(self.datapath))
-        self.data = sqlite3.connect(self.datapath)
+        self.data = sqlite.connect(self.datapath)
         self.data.text_factory = str
         self.execute("""
             CREATE TABLE IF NOT EXISTS yaco(
