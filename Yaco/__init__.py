@@ -396,7 +396,7 @@ class Yaco(dict):
             if k in doNotSave:
                 del data[k]
         if sys.version_info[0] == 2:
-            with open(to_file, 'w') as F:
+            with open(os.path.expanduser(to_file), 'w') as F:
                 F.write(self.dump())
         else:
             with open(to_file, 'w', encoding='utf-8') as F:
