@@ -108,9 +108,9 @@ class Yaco(object):
         else:
             return self.branch.rsplit('.')[-1]
 
-    def find(self, pattern):
+    def find_branch(self, pattern):
         """
-        Find a pattern & return a serie of branches
+        Find a pattern & return a series of branch names
 
         >>> y = Yaco()
         >>> y['a.b'] = 1
@@ -139,6 +139,8 @@ class Yaco(object):
                 continue
             yielded.append(to_yield)
             yield self.get_branch(to_yield)
+
+    find = find_branch
 
     def __str__(self):
         rv = ''
@@ -176,6 +178,8 @@ class Yaco(object):
         >>> assert(a != c)
         """
         ka = set(self.keys())
+        if not hasattr(other, 'keys'):
+            return False
         kb = set(other.keys())
         if ka != kb:
             return False
@@ -314,14 +318,38 @@ class Yaco(object):
     def values(self):
         return self.itervalues()
 
-    def keys(self):
+    def keys(self, depth=0):
         """
+
+        Return an iterator with the keys of this Yaco object.
+        if depth != 0, it returns only keys of that specific depth,
+        so for key 'a.b.c', depth=1 would return only a.
+
+
         >>> a = Yaco({'a.a' : 1, 'a.b' : 2, 'c.b' : 3})
         >>> assert(set(a.keys()) == set(['a.a', 'a.b', 'c.b']))
         >>> s = a.get_branch('a')
         >>> assert(set(s.keys()) == set(['a', 'b']))
+
+        >>> assert(set(a.keys(1)) == set(['a', 'c']))
+
         """
-        return self.iterkeys()
+        if depth == 0:
+            for k, v in self.iteritems():
+                yield k
+        else:
+            yielded = []
+            for k, v in self.iteritems():
+                ks = k.split('.')
+                if len(ks) < depth:
+                    # no keys shorter than depth
+                    continue
+                rv = '.'.join(ks[:depth])
+                if rv in yielded:
+                    continue
+                yielded.append(rv)
+                yield rv
+
 
     def update(self, dict=None):
         """

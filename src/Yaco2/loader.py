@@ -10,7 +10,7 @@ import pkg_resources
 import yaml
 
 lg = logging.getLogger(__name__)
-lg.setLevel(logging.DEBUG)
+#lg.setLevel(logging.DEBUG)
 
 _demo_object = yaml.load(
 """
@@ -23,6 +23,7 @@ a:
 """)
 
 #['pkg://leip/etc/*.config', u'/Users/u0089478/.config/leip/', '/etc/leip/']
+
 
 def guess_loader(data):
     if isinstance(data, dict):
@@ -42,14 +43,15 @@ def guess_loader(data):
             else:
                 raise Exception("unknown file type: {0}".format(data))
         except:
-            #just go for it :/
+            # just go for it :/
             return yaml_file_loader
     elif data[0] == '/' or data[0] == '~':
-        #looks like a file or dir - but may not exists..
+        # looks like a file or dir - but may not exists..
         return dummy_loader
     else:
-        #assume it's just plain yaml
+        # assume it's just plain yaml
         return yaml_string_loader
+
 
 def dummy_loader(yaco_object, data):
     """
@@ -57,11 +59,13 @@ def dummy_loader(yaco_object, data):
     """
     pass
 
+
 def load(yaco_object, data):
     """
     Generic loader - tries to be smart
     """
     guess_loader(data)(yaco_object, data)
+
 
 def dict_loader(yaco_object, dictionary):
     """
@@ -93,6 +97,17 @@ def yaml_file_loader(yaco_object, filename):
     with open(filename) as F:
         parsed = yaml.load(F)
     return dict_loader(yaco_object, parsed)
+
+
+def yaml_file_save(yaco_object, filename):
+    """
+    Save a file to yaml
+    """
+    lg.debug("saving to %s", filename)
+    with open(filename, 'w') as F:
+        F.write(yaml.dump(dict(yaco_object),
+                          encoding=('ascii'),
+                          default_flow_style=False))
 
 
 def dir_loader(yaco_object, path):
@@ -133,6 +148,7 @@ def simple_package_loader(yaco_object, data):
     name, path = data[6:].split('/', 1)
     path = '/' + path
     return package_loader(yaco_object, name, path)
+
 
 def package_loader(yaco_object, pkg_name, path, start_path=None):
 
@@ -180,4 +196,3 @@ def package_loader(yaco_object, pkg_name, path, start_path=None):
         if not pkg_resources.resource_isdir(pkg_name, new_path):
             package_loader(yaco_object.get_branch(branch_name),
                            pkg_name, new_path, start_path)
-
