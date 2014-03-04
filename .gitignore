@@ -3,4 +3,10 @@ Yaco.egg-info
 *#
 *~
 build
-dist
+dist.tox
+*.bak
+PyYAML-3.10-py2.7-macosx-10.8-intel.egg py-1.4.14-py2.7.egg py-1.4.14-py3.3.egg tox-1.4.3-py2.7.egg tox-1.4.3-py3.3.egg virtualenv-1.9.1-py3.3.egg
+*.egg/
+dist/
+*.swp
+.tox/
