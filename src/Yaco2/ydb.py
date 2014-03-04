@@ -2,9 +2,13 @@ import logging
 import os
 import pickle
 import re
-import sqlite3
 import tempfile
 import types
+
+try:
+    import sqlite3 as sqlite
+except ImportError:
+    import pysqlite2.dbapi2 as sqlite
 
 from Yaco2.core import Yaco
 
@@ -77,14 +81,14 @@ class YacoDb(Yaco):
         Open database file & create tables (if needed)
 
         >>> f = _test_yacodb()
-        >>> assert(isinstance(f.data, sqlite3.Connection))
+        >>> assert(isinstance(f.data, sqlite.Connection))
         >>> f.close(delete_db=True)
         """
         dbpath, dbname = os.path.split(self.datapath)
         if not os.path.exists(dbpath):
             os.makedirs(dbpath)
         lg.debug("opening Yaco2 database: {0}".format(self.datapath))
-        self.data = sqlite3.connect(self.datapath)
+        self.data = sqlite.connect(self.datapath)
         self.data.text_factory = bytes
         self.execute("""
             CREATE TABLE IF NOT EXISTS yaco(
