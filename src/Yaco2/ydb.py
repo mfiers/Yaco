@@ -88,8 +88,8 @@ class YacoDb(Yaco):
         if not os.path.exists(dbpath):
             os.makedirs(dbpath)
         lg.debug("opening Yaco2 database: {0}".format(self.datapath))
-        self.data = sqlite.connect(self.datapath)
-        self.data.text_factory = bytes
+        self.data = sqlite3.connect(self.datapath)
+        self.data.text_factory = str
         self.execute("""
             CREATE TABLE IF NOT EXISTS yaco(
                 key text PRIMARY KEY,
@@ -207,7 +207,6 @@ class YacoDb(Yaco):
             DELETE FROM yaco
             WHERE key = ?""", (key,))
 
-
     def clear(self):
         """
         Empty the database
@@ -227,7 +226,7 @@ class YacoDb(Yaco):
         >>> f.close(delete_db=True)
         >>>
         """
-        c = self.execute("""
+        self.execute("""
             DELETE FROM yaco""")
 
     def iteritems(self):
@@ -272,28 +271,27 @@ class YacoDb(Yaco):
             for k, v in res:
                 if self.branch != '':
                     k = k[len(self.branch) + 1:]
-                yield (k.decode('ascii'), pickle.loads(v))
+                yield (k, pickle.loads(v))
             offset += step
 
-    def keys(self):
+    def __len__(self):
         """
-        as dict.keys() - but returns an iterator -
-        to make this work nicely. Note - do not change
-        the contents of the database while iterating!
+        >>> a = Yaco({'a' : 1, 'b' : 2})
+        >>> assert(len(a) == 2)
+        """
+        if self.branch == '':
+            sql = """
+                SELECT COUNT(key) from yaco
+                """
+        else:
+            sql = """
+                SELECT COUNT(key) from yaco
+                WHERE key LIKE '{0}.%'
+                """.format(self.branch)
 
-        >>> f = _test_yacodb()
-        >>> for i in range(10):
-        ...     f[i] = i
-        >>> kys = f.keys()
-        >>> assert(isinstance(kys, types.GeneratorType))
-        >>> i = 0
-        >>> for k in kys:
-        ...     i += 1
-        >>> assert(i == 10)
-        >>> f.close(delete_db=True)
-        """
-        for k, v in self.iteritems():
-            yield k
+        c = self.execute(sql)
+        result = c.fetchone()
+        return result[0]
 
     def iterkeys(self):
         """

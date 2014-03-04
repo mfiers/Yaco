@@ -253,6 +253,20 @@ class LoaderTest(unittest.TestCase):
         self.assertEqual(y, z)
 
 
+    def test_yaml_file_save(self):
+        y = self.get_empty_yaco()
+        y['a.b.c'] = 1
+        y['d.e'] = '2'
+
+        tf = tempfile.NamedTemporaryFile(delete=False)
+        tf.close()
+        Yaco2.yaml_file_save(y, tf.name)
+        tf.close()
+
+        z = Yaco2.Yaco()
+        Yaco2.yaml_file_loader(z, tf.name)
+        self.assertEqual(y, z)
+
     def test_yaml_file_loader_simple(self):
         y = self.get_empty_yaco()
         Yaco2.load(y, self.tf.name)

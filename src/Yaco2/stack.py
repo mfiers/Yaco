@@ -124,6 +124,8 @@ class YacoStack(Yaco):
     def clear(self):
         raise NotImplementedError("dangerous - manipulate the stack directly")
 
+    def __str__(self):
+        return "[YacoStack]{...}"
     # def iteritems(self):
     #     """
     #     >>> a = Yaco({'a.a' : 1, 'a.b' : 2, 'c.b' : 3})
@@ -155,18 +157,37 @@ class YacoStack(Yaco):
     # def values(self):
     #     return self.itervalues()
 
-    def keys(self):
+    def keys(self, depth=0):
         """
+
+        TODO: make this more efficient
+
         >>> a = _get_test_stack()
         >>> assert(set(a.keys()) == \
                 set('a b.c b.d e b.f'.split()))
         >>> s = a.get_branch('b')
         >>> assert(set(s.keys()) == set(['c', 'd', 'f']))
         """
-        rv = set()
+
+        all_keys = set()
         for s in self.stack:
-            rv.update(set(s.keys()))
-        return list(rv)
+            all_keys.update(set(s.keys()))
+
+        if depth == 0:
+            for k in all_keys:
+                yield k
+        else:
+            yielded = []
+            for k in all_keys:
+                ks = k.split('.')
+                if len(ks) < depth:
+                    # no keys shorter than depth
+                    continue
+                rv = '.'.join(ks[:depth])
+                if rv in yielded:
+                    continue
+                yielded.append(rv)
+                yield rv
 
     def update(self, dict=None):
         """

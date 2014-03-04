@@ -37,6 +37,8 @@ from Yaco2.loader import dict_loader, yaml_string_loader, \
     yaml_file_loader, dir_loader, package_loader, \
     simple_package_loader, load
 
+from Yaco2.loader import yaml_file_save
+
 
 #    db    db  .d8b.   .o88b.  .d88b.
 #    `8b  d8' d8' `8b d8P  Y8 .8P  Y8.
