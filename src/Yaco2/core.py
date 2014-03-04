@@ -155,7 +155,8 @@ class Yaco(object):
                 break
             if i > 0:
                 rv += ','
-            rv += "'{0}': {1}".format(k, self[k])
+            v = (" ".join(str(self[k]).split()))[:40]
+            rv += "'{0}': {1}".format(k, v)
 
         try:
             nxt = keygen.next()
@@ -350,6 +351,12 @@ class Yaco(object):
                 yielded.append(rv)
                 yield rv
 
+    def keys1(self):
+        """
+        shortcut for keys(depth=1)
+        """
+        for k in self.keys(1):
+            yield k
 
     def update(self, dict=None):
         """

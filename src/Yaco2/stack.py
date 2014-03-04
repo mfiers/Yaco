@@ -26,6 +26,8 @@ class YacoStack(Yaco):
 
         self.default = default
 
+        self.mode = "merge"
+
         if data is None:
             self.stack = []
         elif isinstance(data, Yaco):
@@ -62,10 +64,12 @@ class YacoStack(Yaco):
     def __repr__(self):
         return repr(self.stack)
 
+
     def __len__(self):
         """
         """
         return len(dict(self))
+
 
     def __getitem__(self, key):
         """
@@ -125,7 +129,15 @@ class YacoStack(Yaco):
         raise NotImplementedError("dangerous - manipulate the stack directly")
 
     def __str__(self):
-        return "[YacoStack]{...}"
+        rv = "[YacoStack]"
+        for s in self.stack[:3]:
+            if isinstance(s, YacoStack):
+                rv += '[[YacoStack]],'
+            else:
+                rv += str(s.branch) + ','
+            rv += '...'
+        rv += "}"
+        return rv
     # def iteritems(self):
     #     """
     #     >>> a = Yaco({'a.a' : 1, 'a.b' : 2, 'c.b' : 3})
@@ -189,6 +201,7 @@ class YacoStack(Yaco):
                 yielded.append(rv)
                 yield rv
 
+
     def update(self, dict=None):
         """
         >>> a = _get_test_stack()
@@ -204,6 +217,7 @@ class YacoStack(Yaco):
         if len(self.stack) == 0:
             raise YacoEmptyStack()
         self.stack[0].update(dict)
+
 
     def __contains__(self, key):
         """
