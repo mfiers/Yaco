@@ -6,7 +6,11 @@ import unittest
 import yaml
 import collections
 
-from sqlite3 import ProgrammingError
+
+try:
+    from sqlite3 import ProgrammingError
+except ImportError:
+    from pysqlite2.dbapi2 import ProgrammingError
 
 import Yaco2
 
