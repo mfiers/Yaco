@@ -90,6 +90,8 @@ class YacoDb(Yaco):
         lg.debug("opening Yaco2 database: {0}".format(self.datapath))
         self.data = sqlite.connect(self.datapath)
         self.data.text_factory = str
+        self.execute("PRAGMA page_size = 16384")
+        self.execute("PRAGMA cache_size = 16384")
         self.execute("""
             CREATE TABLE IF NOT EXISTS yaco(
                 key text PRIMARY KEY,
